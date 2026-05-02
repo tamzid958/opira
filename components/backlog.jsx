@@ -710,22 +710,30 @@ function BacklogSection({
 // `?sprint=<id>`), only that sprint is rendered — no pagination needed.
 const SPRINT_PAGE_SIZE = 2;
 
-// Order sprints so the freshest ones render at the top: active first
-// (anything currently running), then planned (upcoming), then closed —
-// each tier sorted by start date descending so "Sprint 32" beats
-// "Sprint 31". Sprints without a start date sink within their tier.
+// Latest first: sort purely by start date descending so the most recently
+// scheduled sprint always wins. Sprints without a start date sink to the
+// bottom; ties break by numeric id descending (newer OP versions get
+// higher ids), which keeps "Sprint 32" above "Sprint 31" when both lack
+// start dates.
 function sortSprintsByRecency(list) {
-  const tier = (s) => (s.state === "active" ? 0 : s.state === "planned" ? 1 : 2);
   return [...list].sort((a, b) => {
-    const dt = tier(a) - tier(b);
-    if (dt !== 0) return dt;
     const aStart = a.start && a.start !== "—" ? a.start : "";
     const bStart = b.start && b.start !== "—" ? b.start : "";
     if (aStart && bStart) return bStart.localeCompare(aStart);
     if (aStart) return -1;
     if (bStart) return 1;
-    return 0;
+    const aId = Number(a.id) || 0;
+    const bId = Number(b.id) || 0;
+    return bId - aId;
   });
+}
+
+// A sprint literally named "Backlog" (case-insensitive, trimmed) is the
+// open-ended catch-all the team uses to hold work that isn't yet on a
+// sprint. It always renders separately, outside the paginated window, so
+// it never pages off-screen.
+function isBacklogSprint(sprint) {
+  return String(sprint?.name || "").trim().toLowerCase() === "backlog";
 }
 
 export function Backlog({
@@ -859,9 +867,21 @@ export function Backlog({
   // Versions are API-driven; no static fallback. If the API returns no
   // sprints (yet to load, or none in the project), we render nothing here
   // and only fall through to the unscheduled-tasks empty/section below.
-  const sprintList = useMemo(
+  // Split into the "Backlog"-named sprints (always shown, outside
+  // pagination) and the rest of the sprints (sorted latest-first, then
+  // paginated). The split is by name only — OP doesn't model a separate
+  // "backlog" version type, so we look for the literal label.
+  const sortedAllSprints = useMemo(
     () => sortSprintsByRecency(Array.isArray(sprints) ? sprints : []),
     [sprints],
+  );
+  const backlogSprints = useMemo(
+    () => sortedAllSprints.filter(isBacklogSprint),
+    [sortedAllSprints],
+  );
+  const sprintList = useMemo(
+    () => sortedAllSprints.filter((s) => !isBacklogSprint(s)),
+    [sortedAllSprints],
   );
   // When the caller pins a sprint (filter on URL), we render only that
   // sprint and skip pagination. Otherwise we render a fixed-size window
@@ -869,9 +889,9 @@ export function Backlog({
   const pinnedSprint = useMemo(
     () =>
       pinnedSprintId
-        ? sprintList.find((s) => s.id === pinnedSprintId) || null
+        ? sortedAllSprints.find((s) => s.id === pinnedSprintId) || null
         : null,
-    [pinnedSprintId, sprintList],
+    [pinnedSprintId, sortedAllSprints],
   );
   const sprintPageCount = Math.max(
     1,
@@ -920,7 +940,7 @@ export function Backlog({
     [tasks],
   );
 
-  if (sprintList.length === 0 && tasks.length === 0) {
+  if (sortedAllSprints.length === 0 && tasks.length === 0) {
     return (
       <div className="py-10">
         <EmptyState
@@ -1048,6 +1068,49 @@ export function Backlog({
           );
         })()}
 
+        {/* "Backlog"-named sprints always render here, outside the
+            paginated window above. Hidden when the user has pinned a
+            specific sprint via URL filter. */}
+        {!pinnedSprint && backlogSprints.map((sp) => {
+          const sTasks = tasksBySprint.get(sp.id) || [];
+          const hasDates =
+            sp.start && sp.start !== "—" && sp.end && sp.end !== "—";
+          const dateRange = hasDates ? `${sp.start} – ${sp.end}` : "No dates set";
+          return (
+            <BacklogSection
+              key={sp.id}
+              title={sp.name}
+              sub={dateRange}
+              tasks={sTasks}
+              sprint={sp}
+              isSprint
+              isOver={overId === sp.id}
+              statuses={statuses}
+              assignees={assignees}
+              manageVersions={manageVersions}
+              canCreate={canCreate}
+              velocity={velocity}
+              estimateUnit={estimateUnit}
+              focusedId={focusedId}
+              selected={selected}
+              onSelectChange={onSelectChange}
+              onSelectAll={onSelectAll}
+              onTaskClick={onTaskClick}
+              onStatusChange={onStatusChange}
+              onAssigneeChange={onAssigneeChange}
+              onStartSprint={onStartSprint}
+              onCompleteSprint={onCompleteSprint}
+              onCreateSprint={onCreateSprint}
+              onEditSprint={onEditSprint}
+              onDeleteSprint={onDeleteSprint}
+              onExportCsv={onExportCsv}
+              onSetVersionStatus={onSetVersionStatus}
+              onCreate={onCreate}
+              carryoverByWpId={carryover?.byWpId}
+            />
+          );
+        })}
+
         {!pinnedSprint && unscheduled.length > 0 && (
         <BacklogSection
           title="Without sprint"
@@ -1171,9 +1234,12 @@ export function Backlog({
                 clearSelection();
               }}
               items={[
-                { label: "Backlog", value: null, icon: "backlog" },
+                // "Without sprint" detaches the WP from any version. A
+                // literal OP version named "Backlog" is a different thing
+                // (a real id) and shows up below alongside other sprints.
+                { label: "Without sprint", value: null, icon: "backlog" },
                 { divider: true },
-                ...sprintList.map((s) => ({
+                ...sortedAllSprints.map((s) => ({
                   label:
                     s.name?.split(" — ")[0] +
                     (s.state === "active" ? " (active)" : ""),
