@@ -190,10 +190,15 @@ function SprintHealthTile({ projectId, activeSprint }) {
 
   const data = q.data || {};
   const unit = data.unit || "pts";
-  const committed = data.committedAtStart || data.totalCommitted || 0;
-  const lastRemaining = data.points?.[data.points.length - 1]?.remaining ?? committed;
-  const donePct = committed > 0
-    ? Math.max(0, Math.min(100, Math.round(((committed - lastRemaining) / committed) * 100)))
+  // Denominator is current scope (baseline ± mid-sprint adds/removes), so the
+  // percent stays in [0, 100] when scope grew. Trend pill below still compares
+  // against baseline — that's the standard burndown ideal line.
+  const baseline = data.committedAtStart || 0;
+  const totalScope = data.totalCommitted || baseline;
+  const lastRemaining = data.points?.[data.points.length - 1]?.remaining ?? totalScope;
+  const done = Math.max(0, totalScope - lastRemaining);
+  const donePct = totalScope > 0
+    ? Math.max(0, Math.min(100, Math.round((done / totalScope) * 100)))
     : 0;
 
   const start = safeISO(activeSprint.start);
@@ -201,10 +206,11 @@ function SprintHealthTile({ projectId, activeSprint }) {
   const today = new Date();
   let trend = "neutral";
   let trendLabel = "On track";
-  if (start && end && committed > 0 && data.points?.length) {
+  const idealBase = baseline || totalScope;
+  if (start && end && idealBase > 0 && data.points?.length) {
     const totalDays = Math.max(1, differenceInCalendarDays(end, start));
     const elapsed = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today, start)));
-    const idealRemaining = committed * (1 - elapsed / totalDays);
+    const idealRemaining = idealBase * (1 - elapsed / totalDays);
     const delta = lastRemaining - idealRemaining;
     if (delta > 0.5) {
       trend = "warn";
@@ -213,7 +219,7 @@ function SprintHealthTile({ projectId, activeSprint }) {
       trend = "good";
       trendLabel = `${Math.round(-delta)} ${unit} ahead`;
     }
-  } else if (committed === 0) {
+  } else if (idealBase === 0) {
     trendLabel = "No commit";
   }
 
@@ -245,7 +251,7 @@ function SprintHealthTile({ projectId, activeSprint }) {
           {donePct}%
         </div>
         <div className="text-[11px] text-fg-subtle leading-snug pb-1">
-          {committed - lastRemaining} of {committed} {unit} done
+          {done} of {totalScope} {unit} done
         </div>
         <div className="ml-auto flex flex-col items-end gap-1 text-[11px] text-fg-subtle">
           {scopeChanged ? (

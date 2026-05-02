@@ -122,6 +122,16 @@ async function computeBurndown(projectId, sprintId) {
     ),
   );
 
+  // Canonical closed-status set, name-indexed. The activity journal renders
+  // status transitions as text ("Status changed from X to Y"), so we have to
+  // match against status *names* — but the closed/open classification is still
+  // driven by `status.isClosed` from /statuses, never by keyword guessing.
+  const closedStatusNames = new Set(
+    (lookups?.statuses || [])
+      .filter((s) => s.isClosed && s.name)
+      .map((s) => s.name.trim().toLowerCase()),
+  );
+
   const transitions = [];
   const scopeEvents = [];
   const carryOver = {};
@@ -138,8 +148,12 @@ async function computeBurndown(projectId, sprintId) {
     for (const a of r.acts) {
       const day = (a.createdAt || "").slice(0, 10);
       for (const detail of a.details || []) {
-        if (/status/i.test(detail)) {
-          transitions.push({ wpId, day, text: detail });
+        if (/^\s*status\b/i.test(detail)) {
+          transitions.push({
+            wpId,
+            day,
+            toClosed: detailTransitionsToClosed(detail, closedStatusNames),
+          });
         }
         if (sprint.name) {
           const kind = classifyVersionDetail(detail, sprint.name);
@@ -283,12 +297,13 @@ async function computeBurndown(projectId, sprintId) {
     .sort((a, b) => String(a.day || "").localeCompare(String(b.day || "")));
   const doneBy = new Map();
   for (const tr of sortedTransitions) {
-    const isDone = /\b(done|closed|resolved)\b/i.test(tr.text);
-    if (isDone) {
+    if (tr.toClosed === true) {
       doneBy.set(tr.wpId, tr.day);
-    } else if (doneBy.has(tr.wpId)) {
+    } else if (tr.toClosed === false && doneBy.has(tr.wpId)) {
       doneBy.delete(tr.wpId);
     }
+    // toClosed === null → couldn't parse the destination; leave doneBy alone
+    // and let the post-walk reconciliation against `statusIsClosed` correct it.
   }
   // Currently-done WPs that have no journal "done" event (closed before the
   // journal retention window, or activities fetch was capped). Anchor them
@@ -346,6 +361,21 @@ async function computeBurndown(projectId, sprintId) {
     mode,
     unit: unitFor(mode),
   };
+}
+
+// Parse OP's "Status changed from X to Y" / "Status set to Y" detail lines
+// and ask whether Y is a closed status. Returns null when the destination
+// can't be extracted — caller treats that as "no signal" rather than open.
+function detailTransitionsToClosed(detail, closedStatusNames) {
+  if (!detail || closedStatusNames.size === 0) return null;
+  const stripped = detail.replace(/[*_`]+/g, "");
+  // Last " to " wins: handles both "from X to Y" and "set to Y", and survives
+  // status names containing " to ".
+  const idx = stripped.toLowerCase().lastIndexOf(" to ");
+  if (idx === -1) return null;
+  const dest = stripped.slice(idx + 4).trim().replace(/[.\s]+$/, "");
+  if (!dest) return null;
+  return closedStatusNames.has(dest.toLowerCase());
 }
 
 export async function GET(req, ctx) {
