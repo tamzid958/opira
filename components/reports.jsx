@@ -255,12 +255,21 @@ function Burndown({ projectId, sprint }) {
   const H = 280;
   const PAD_L = 44;
   const PAD_R = 20;
-  const PAD_T = 18;
+  const PAD_T = 28;
   const PAD_B = 30;
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
+  // Y-axis scales to whichever is larger: committed-at-start, or the peak
+  // remaining over the sprint. Mid-sprint scope additions push `remaining`
+  // above the baseline, and without this clamp the actual line spikes
+  // above the top gridline.
+  const peakRemaining = (data.points || []).reduce(
+    (m, p) => Math.max(m, p.remaining || 0),
+    0,
+  );
+  const yMax = Math.max(totalPts, peakRemaining, 1);
   const xAt = (i) => PAD_L + (i / Math.max(days, 1)) * innerW;
-  const yAt = (pts) => PAD_T + (1 - pts / Math.max(totalPts, 1)) * innerH;
+  const yAt = (pts) => PAD_T + (1 - pts / yMax) * innerH;
 
   // Working-days-aware ideal: the line only descends on working days, so
   // weekends render as horizontal segments. Falls back to a straight line
@@ -289,10 +298,48 @@ function Burndown({ projectId, sprint }) {
     : "";
   const todayIdx = (data.points || []).length - 1;
   const lastRemaining = data.points?.[todayIdx]?.remaining;
-  const projectedDelta =
-    lastRemaining != null && totalPts > 0 && todayIdx >= 0
-      ? lastRemaining - totalPts * (1 - todayIdx / Math.max(days, 1))
-      : null;
+
+  // Pace — answers "at our current burn rate, will we finish on time?"
+  // We compare working-days needed (remaining ÷ burn rate) to working-days
+  // left in the sprint. Threshold of 0.75 day keeps small rounding noise
+  // from flipping "On pace" → "1d behind".
+  const currentScope = data.totalCommitted || totalPts;
+  const doneScope = Math.max(0, currentScope - (lastRemaining ?? currentScope));
+  const donePct = currentScope > 0 ? Math.round((doneScope / currentScope) * 100) : 0;
+  const remainingPct = Math.max(0, 100 - donePct);
+  const workingDaysElapsed = calendar.days[todayIdx]?.workingSeen ?? 0;
+  const workingDaysTotal = calendar.totalWorkingDays || 0;
+  const workingDaysLeft = Math.max(0, workingDaysTotal - workingDaysElapsed);
+  let paceLabel = "—";
+  let paceTone = "neutral";
+  if (currentScope > 0 && lastRemaining != null) {
+    if (lastRemaining <= 0) {
+      paceLabel = "Done";
+      paceTone = "good";
+    } else if (workingDaysElapsed <= 0) {
+      paceLabel = "Not started";
+    } else if (doneScope <= 0) {
+      paceLabel = "No burn yet";
+      paceTone = "warn";
+    } else {
+      const burnRate = doneScope / workingDaysElapsed;
+      const daysNeeded = lastRemaining / burnRate;
+      const delta = daysNeeded - workingDaysLeft;
+      if (workingDaysLeft <= 0) {
+        paceLabel = "Sprint ended";
+        paceTone = "warn";
+      } else if (delta >= 0.75) {
+        paceLabel = `${Math.max(1, Math.round(delta))}d behind`;
+        paceTone = "warn";
+      } else if (delta <= -0.75) {
+        paceLabel = `${Math.max(1, Math.round(-delta))}d ahead`;
+        paceTone = "good";
+      } else {
+        paceLabel = "On pace";
+        paceTone = "good";
+      }
+    }
+  }
 
   // Baseline-source signal:
   //   "timestamps"     — clean snapshot, the displayed numbers are exact.
@@ -388,7 +435,7 @@ function Burndown({ projectId, sprint }) {
                 textAnchor="end"
                 fill="var(--text-3)"
               >
-                {Math.round(totalPts * (1 - f))}
+                {Math.round(yMax * (1 - f))}
               </text>
             ))}
             {Array.from({ length: days + 1 }, (_, i) => i)
@@ -444,51 +491,43 @@ function Burndown({ projectId, sprint }) {
       )}
       {totalPts > 0 && (
         <div className="grid grid-cols-4 gap-px bg-border-soft border-t border-border-soft">
-          <BurndownStat label="Committed at start" value={`${totalPts} ${unit}`} />
-          <BurndownStat label="Remaining" value={`${lastRemaining ?? totalPts} ${unit}`} />
           <BurndownStat
-            label="Scope change"
-            value={
-              data.addedAfterStart || data.removedAfterStart
-                ? `${data.addedAfterStart?.points > 0 ? "+" : ""}${data.addedAfterStart?.points || 0}${
-                    data.removedAfterStart?.points > 0
-                      ? ` / −${data.removedAfterStart.points}`
+            label="Scope"
+            value={`${currentScope} ${unit}`}
+            hint={
+              (data.addedAfterStart?.points || 0) > 0 ||
+              (data.removedAfterStart?.points || 0) > 0
+                ? `Started at ${totalPts} ${unit}${
+                    data.addedAfterStart?.points > 0
+                      ? `, +${data.addedAfterStart.points} added`
                       : ""
-                  } ${unit}`
-                : "—"
-            }
-            tone={
-              (data.addedAfterStart?.points || 0) > 0
-                ? "warn"
-                : (data.removedAfterStart?.points || 0) > 0
-                ? "warn"
-                : "neutral"
+                  }${
+                    data.removedAfterStart?.points > 0
+                      ? `, −${data.removedAfterStart.points} removed`
+                      : ""
+                  }.`
+                : null
             }
           />
           <BurndownStat
-            label="Trend"
-            value={
-              projectedDelta == null
-                ? "—"
-                : projectedDelta > 0.5
-                ? `+${Math.round(projectedDelta)} behind`
-                : projectedDelta < -0.5
-                ? `${Math.round(projectedDelta)} ahead`
-                : "On track"
-            }
+            label="Done"
+            value={`${doneScope} ${unit} · ${donePct}%`}
+            tone={doneScope > 0 ? "good" : "neutral"}
+          />
+          <BurndownStat
+            label="Remaining"
+            value={`${lastRemaining ?? currentScope} ${unit} · ${remainingPct}%`}
+          />
+          <BurndownStat
+            label="Pace"
+            value={paceLabel}
+            tone={paceTone}
             hint={
-              baselineApprox && projectedDelta != null && projectedDelta > 0.5
-                ? "Behind a moving target — scope grew during the sprint, so the baseline is current scope rather than the day-1 commit."
+              paceLabel.endsWith("behind")
+                ? `At your current burn rate (${(doneScope / Math.max(workingDaysElapsed, 1)).toFixed(1)} ${unit}/day), the remaining ${lastRemaining} ${unit} won't fit in the ${workingDaysLeft} working day${workingDaysLeft === 1 ? "" : "s"} left.`
+                : paceLabel.endsWith("ahead")
+                ? "On current burn rate you'll finish before the sprint ends."
                 : null
-            }
-            tone={
-              projectedDelta == null
-                ? "neutral"
-                : projectedDelta > 0.5
-                ? "warn"
-                : projectedDelta < -0.5
-                ? "good"
-                : "neutral"
             }
           />
         </div>
@@ -581,19 +620,43 @@ function SprintReport({ projectId, sprint, sprintTasks, mode = "numeric" }) {
               value={`${committedAtStart} ${unit}`}
             />
             <BurndownStat
+              label="Final scope"
+              value={`${committedAtStart + added.points - removed.points} ${unit}`}
+              hint={
+                added.points > 0 || removed.points > 0
+                  ? `${added.points > 0 ? `+${added.points} added (${added.count})` : ""}${
+                      added.points > 0 && removed.points > 0 ? ", " : ""
+                    }${removed.points > 0 ? `−${removed.points} removed (${removed.count})` : ""}.`
+                  : null
+              }
+              tone={added.points > 0 || removed.points > 0 ? "warn" : "neutral"}
+            />
+            <BurndownStat
               label="Completed"
               value={`${completedPts} ${unit}`}
               tone={completedPts >= committedAtStart && committedAtStart > 0 ? "good" : "neutral"}
             />
             <BurndownStat
-              label="Added mid-sprint"
-              value={`${added.points} ${unit} (${added.count})`}
-              tone={added.points > 0 ? "warn" : "neutral"}
-            />
-            <BurndownStat
-              label="Removed mid-sprint"
-              value={`${removed.points} ${unit} (${removed.count})`}
-              tone={removed.points > 0 ? "warn" : "neutral"}
+              label="Hit rate"
+              value={
+                committedAtStart > 0
+                  ? `${Math.round((completedPts / committedAtStart) * 100)}%`
+                  : "—"
+              }
+              hint={
+                committedAtStart > 0
+                  ? `${completedPts} of ${committedAtStart} ${unit} committed at start.`
+                  : null
+              }
+              tone={
+                committedAtStart === 0
+                  ? "neutral"
+                  : completedPts >= committedAtStart
+                  ? "good"
+                  : completedPts >= committedAtStart * 0.8
+                  ? "neutral"
+                  : "warn"
+              }
             />
           </div>
           <ScopeEventsTable
@@ -710,11 +773,99 @@ function BurndownStat({ label, value, tone = "neutral", hint = null }) {
 // ─────────────────────────────────────────────────────────────────
 // Velocity — committed vs. completed bars per closed sprint.
 
+// A single bar in the velocity chart. Zero values render a 3px nub so the
+// floating "0" label has something to anchor on instead of hovering over
+// empty space.
+function VelocityBar({ value, max, barClass, labelClass }) {
+  const safeMax = Math.max(1, max);
+  const pct = value > 0 ? (value / safeMax) * 100 : 0;
+  return (
+    <div
+      className={`w-6 sm:w-7 rounded-t-md relative transition-[height] duration-300 ${barClass}`}
+      style={{ height: pct > 0 ? `${pct}%` : "3px" }}
+    >
+      <span
+        className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] whitespace-nowrap ${labelClass}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// One-sprint case: with a single closed sprint there's no trend to draw,
+// so show a focused commit-vs-complete comparison card instead of a lonely
+// pair of bars.
+function SingleSprintVelocity({ sprint, unit }) {
+  const hitRate =
+    sprint.committed > 0
+      ? Math.round((sprint.completed / sprint.committed) * 100)
+      : null;
+  const hitTone =
+    hitRate == null
+      ? "text-fg-muted"
+      : hitRate >= 100
+      ? "text-status-done-fg"
+      : hitRate >= 80
+      ? "text-fg"
+      : "text-status-blocked-fg";
+  return (
+    <div className="px-6 py-6 flex-1 flex flex-col justify-center gap-4">
+      <div
+        className="text-[12px] text-fg-subtle text-center max-w-24 truncate mx-auto"
+        title={sprint.sprintName}
+      >
+        {sprint.sprintName?.split(" — ")[0] || sprint.sprintName}
+      </div>
+      <div className="grid grid-cols-3 gap-4 items-end">
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-fg-subtle font-semibold mb-1">
+            Committed
+          </div>
+          <div className="font-display text-[32px] font-semibold tabular-nums tracking-[-0.024em] text-fg leading-none">
+            {sprint.committed}
+          </div>
+          <div className="text-[10px] text-fg-faint mt-1">{unit}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-fg-subtle font-semibold mb-1">
+            Completed
+          </div>
+          <div
+            className={`font-display text-[32px] font-semibold tabular-nums tracking-[-0.024em] leading-none ${
+              sprint.completed >= sprint.committed && sprint.committed > 0
+                ? "text-status-done-fg"
+                : "text-fg"
+            }`}
+          >
+            {sprint.completed}
+          </div>
+          <div className="text-[10px] text-fg-faint mt-1">{unit}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-fg-subtle font-semibold mb-1">
+            Hit
+          </div>
+          <div
+            className={`font-display text-[32px] font-semibold tabular-nums tracking-[-0.024em] leading-none ${hitTone}`}
+          >
+            {hitRate == null ? "—" : `${hitRate}%`}
+          </div>
+          <div className="text-[10px] text-fg-faint mt-1">of commit</div>
+        </div>
+      </div>
+      <div className="text-[11px] text-fg-faint text-center mt-2">
+        Close another sprint to see the velocity trend.
+      </div>
+    </div>
+  );
+}
+
 function VelocityChart({ projectId }) {
   const q = useVelocity(projectId, !!projectId);
   if (q.isLoading) {
     return (
-      <div className={PANEL}>
+      <div className={`${PANEL} w-full flex flex-col`}>
         <div className={PANEL_HEADER}>
           <h3 className={PANEL_TITLE}>Velocity</h3>
           <LoadingPill label="loading velocity" />
@@ -727,11 +878,13 @@ function VelocityChart({ projectId }) {
   const max = Math.max(50, ...data.sprints.map((s) => Math.max(s.committed, s.completed)));
 
   return (
-    <div className={PANEL}>
+    <div className={`${PANEL} w-full flex flex-col`}>
       <div className={PANEL_HEADER}>
         <h3 className={PANEL_TITLE}>Velocity</h3>
         <span className={PANEL_SUB}>
-          Last {data.sprints.length} closed sprint{data.sprints.length === 1 ? "" : "s"}
+          {data.sprints.length === 1
+            ? "1 closed sprint so far"
+            : `Last ${data.sprints.length} closed sprints`}
         </span>
         <div className={PANEL_LEGEND}>
           <span className="inline-flex items-center">
@@ -749,8 +902,10 @@ function VelocityChart({ projectId }) {
           title="No velocity yet"
           body="Velocity is calculated from closed sprints. Complete a sprint to see the chart."
         />
+      ) : data.sprints.length === 1 ? (
+        <SingleSprintVelocity sprint={data.sprints[0]} unit={unit} />
       ) : (
-        <div className="relative px-6 pt-8 pb-4">
+        <div className="relative px-6 pt-8 pb-4 flex-1 flex flex-col">
           {data.avg > 0 && (
             <div
               className="absolute left-6 right-6 border-t border-dashed border-accent-200 pointer-events-none"
@@ -765,22 +920,18 @@ function VelocityChart({ projectId }) {
             {data.sprints.map((s) => (
               <div key={s.sprintId} className="flex-1 flex flex-col items-center gap-2 min-w-12">
                 <div className="flex gap-1.5 items-end h-44 relative">
-                  <div
-                    className="w-6 sm:w-7 rounded-t-md bg-accent-200 relative transition-[height] duration-300"
-                    style={{ height: `${(s.committed / max) * 100}%` }}
-                  >
-                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-fg-subtle font-semibold whitespace-nowrap">
-                      {s.committed}
-                    </span>
-                  </div>
-                  <div
-                    className="w-6 sm:w-7 rounded-t-md bg-accent relative transition-[height] duration-300"
-                    style={{ height: `${(s.completed / max) * 100}%` }}
-                  >
-                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-accent-700 font-bold whitespace-nowrap">
-                      {s.completed}
-                    </span>
-                  </div>
+                  <VelocityBar
+                    value={s.committed}
+                    max={max}
+                    barClass="bg-accent-200"
+                    labelClass="text-fg-subtle font-semibold"
+                  />
+                  <VelocityBar
+                    value={s.completed}
+                    max={max}
+                    barClass="bg-accent"
+                    labelClass="text-accent-700 font-bold"
+                  />
                 </div>
                 <div
                   className="text-[11px] text-fg-muted font-medium max-w-24 text-center truncate"
@@ -810,40 +961,53 @@ function ThroughputPanel({ projectId }) {
   const prev = completed[completed.length - 2] ?? 0;
   const delta = prev > 0 ? Math.round(((last - prev) / prev) * 100) : null;
 
+  // Throughput is a *trend* indicator — with fewer than 2 closed sprints
+  // the sparkline has nothing to draw and a "0 last sprint" hero number is
+  // more misleading than informative. Show a single empty state instead.
+  const hasTrend = completed.length >= 2;
+
   return (
-    <div className={PANEL}>
+    <div className={`${PANEL} w-full flex flex-col`}>
       <div className={PANEL_HEADER}>
         <h3 className={PANEL_TITLE}>Throughput</h3>
         <span className={PANEL_SUB}>
           {unit === "d" ? "Working days completed per sprint" : "Story points completed per sprint"}
         </span>
       </div>
-      <div className="px-5 py-5 grid gap-3">
-        <div className="flex items-baseline gap-3">
-          <div className="font-display text-[40px] font-semibold tracking-[-0.028em] text-fg leading-none tabular-nums">
-            {last}
+      {!hasTrend ? (
+        <div className="px-5 py-6 flex-1 grid place-items-center text-center text-[12px] text-fg-subtle leading-relaxed">
+          {completed.length === 0
+            ? "Close a sprint to start tracking throughput."
+            : "Need at least 2 closed sprints to compare."}
+        </div>
+      ) : (
+        <div className="px-5 py-5 grid gap-3">
+          <div className="flex items-baseline gap-3">
+            <div className="font-display text-[40px] font-semibold tracking-[-0.028em] text-fg leading-none tabular-nums">
+              {last}
+            </div>
+            <div className="text-[12px] text-fg-subtle">last sprint</div>
+            {delta != null && delta !== 0 && (
+              <span
+                className={`ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums ${
+                  delta > 0
+                    ? "bg-status-done-bg text-status-done-fg"
+                    : "bg-status-blocked-bg text-status-blocked-fg"
+                }`}
+              >
+                {delta > 0 ? "+" : ""}
+                {delta}%
+              </span>
+            )}
           </div>
-          <div className="text-[12px] text-fg-subtle">last sprint</div>
-          {delta != null && delta !== 0 && (
-            <span
-              className={`ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums ${
-                delta > 0
-                  ? "bg-status-done-bg text-status-done-fg"
-                  : "bg-status-blocked-bg text-status-blocked-fg"
-              }`}
-            >
-              {delta > 0 ? "+" : ""}
-              {delta}%
-            </span>
-          )}
+          <Sparkline values={completed} height={64} color="var(--accent)" fill />
+          <div className="flex justify-between text-[11px] text-fg-subtle">
+            <span>{data.sprints[0]?.sprintName?.split(" — ")[0] || "—"}</span>
+            <span>Avg {data.avg} {unit}</span>
+            <span>{data.sprints[data.sprints.length - 1]?.sprintName?.split(" — ")[0] || "—"}</span>
+          </div>
         </div>
-        <Sparkline values={completed} height={64} color="var(--accent)" fill />
-        <div className="flex justify-between text-[11px] text-fg-subtle">
-          <span>{data.sprints[0]?.sprintName?.split(" — ")[0] || "—"}</span>
-          <span>Avg {data.avg} {unit}</span>
-          <span>{data.sprints[data.sprints.length - 1]?.sprintName?.split(" — ")[0] || "—"}</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -1314,11 +1478,13 @@ export function Reports({ sprint, projectId, tasks = [] }) {
           mode={mode}
         />
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
+          <div className="lg:col-span-2 flex">
             <VelocityChart projectId={projectId} />
           </div>
-          <ThroughputPanel projectId={projectId} />
+          <div className="flex">
+            <ThroughputPanel projectId={projectId} />
+          </div>
         </div>
 
         <MemberContribution

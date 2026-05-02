@@ -59,28 +59,39 @@ async function computeVelocity(projectId) {
     closed.map(async (v) => {
       const filters = buildFilters([{ version: { operator: "=", values: [v.id] } }]);
       const ts = `${v.end}T23:59:59Z`;
-      let wpEls;
+      // Live WPs drive `completed` — `statusIsClosed` reflects the current
+      // status, so work that was finished AFTER the sprint was closed still
+      // counts (matches how teams actually use OP: close the sprint first,
+      // then mark stragglers done).
+      const liveEls = await fetchAllPages(
+        `/projects/${encodeURIComponent(projectId)}/work_packages`,
+        { filters },
+      );
+      // Snapshot WPs drive `committed` — using the sprint-end snapshot so a
+      // post-close points resize ("we bumped M to L last week") doesn't
+      // retroactively rewrite historical velocity. Falls back to live if
+      // the OP install doesn't expose the `timestamps` filter.
+      let snapshotEls = liveEls;
       let timeTraveled = false;
       try {
-        wpEls = await fetchAllPages(
+        snapshotEls = await fetchAllPages(
           `/projects/${encodeURIComponent(projectId)}/work_packages`,
           { filters, timestamps: ts },
         );
         timeTraveled = true;
       } catch {
-        wpEls = await fetchAllPages(
-          `/projects/${encodeURIComponent(projectId)}/work_packages`,
-          { filters },
-        );
+        // keep liveEls as the fallback
       }
-      const wps = wpEls.map((wp) => mapWorkPackage(wp, lookups));
+      const liveWps = liveEls.map((wp) => mapWorkPackage(wp, lookups));
+      const snapshotWps = snapshotEls.map((wp) => mapWorkPackage(wp, lookups));
       // Use the project mode (schema-derived) for per-sprint sums so a
       // point-mode project's historical velocity isn't computed as
       // working-day counts on sprints that happen to have unsized WPs.
-      const sprintMode = schemaMode || inferModeFromTasks(wps) || "numeric";
+      const sprintMode =
+        schemaMode || inferModeFromTasks(liveWps) || "numeric";
       const opts = { mode: sprintMode };
-      const committed = wps.reduce((s, t) => s + weightOf(t, opts), 0);
-      const completed = wps
+      const committed = snapshotWps.reduce((s, t) => s + weightOf(t, opts), 0);
+      const completed = liveWps
         .filter((t) => t.statusIsClosed)
         .reduce((s, t) => s + weightOf(t, opts), 0);
       return {
