@@ -39,6 +39,7 @@ import {
   useActivities,
   useCarryover,
   useCustomOptions,
+  useAvailableAssignees,
   usePostComment,
   useUpdateComment,
   useWpFileLinks,
@@ -292,6 +293,12 @@ export function TaskDetail({
   // `spField.allowedValues` instead. Prefer the link-fetched list when it's
   // available (more authoritative), fall back to the discovered list.
   const spOptions = spOptionsQ.data || spField?.allowedValues || null;
+
+  // Backing list for the @-mention picker in the description, comment
+  // composer, and comment-edit editor. Scoped to project members only —
+  // instance-wide users who aren't members shouldn't surface in the picker.
+  const mentionUsersQ = useAvailableAssignees(projectId, !!projectId);
+  const mentionUsers = mentionUsersQ.data || [];
 
   useEffect(() => {
     if (!task) return;
@@ -556,6 +563,7 @@ export function TaskDetail({
                   placeholder="Describe the work — formatting is supported."
                   minHeight={160}
                   autoFocus
+                  mentionUsers={mentionUsers}
                 />
                 <div className="flex justify-end gap-1.5 mt-2">
                   <button
@@ -732,6 +740,7 @@ export function TaskDetail({
                             placeholder="Add a comment…"
                             minHeight={64}
                             onSubmit={onSubmitComment}
+                            mentionUsers={mentionUsers}
                           />
                         )}
                       />
@@ -767,7 +776,12 @@ export function TaskDetail({
                   </div>
                 )}
                 {pagedComments.map((c) => (
-                  <ActivityItem key={c.id} activity={c} onEdit={onEditComment} />
+                  <ActivityItem
+                    key={c.id}
+                    activity={c}
+                    onEdit={onEditComment}
+                    mentionUsers={mentionUsers}
+                  />
                 ))}
 
                 {showCommentPager && (

@@ -13,7 +13,7 @@ import { PEOPLE } from "@/lib/data";
 import { friendlyError } from "@/lib/api-client";
 import { formatRelDate } from "@/lib/utils";
 
-export function ActivityItem({ activity, onEdit }) {
+export function ActivityItem({ activity, onEdit, mentionUsers }) {
   const author = activity.author ? PEOPLE[activity.author] : null;
   const isComment = activity.kind === "comment";
   // Author-or-permitted users get an inline edit affordance; OP exposes
@@ -99,6 +99,7 @@ export function ActivityItem({ activity, onEdit }) {
                 autoFocus
                 disabled={saving}
                 onSubmit={saveEdit}
+                mentionUsers={mentionUsers}
               />
               <div className="flex items-center gap-2 justify-end mt-2">
                 <button

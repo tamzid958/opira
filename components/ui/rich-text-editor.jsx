@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Icon } from "@/components/icons";
+import { OpMention, buildMentionSuggestion } from "@/components/ui/op-mention";
 
 // Tiptap's StarterKit v3 bundles a Link extension out of the box; we
 // configure it inline below instead of importing `@tiptap/extension-link`
@@ -50,10 +51,27 @@ export function RichTextEditor({
   onSubmit,
   disabled = false,
   className = "",
+  // When `mentionUsers` is supplied (typically from useUsers().data), typing
+  // `@` opens a picker that inserts an OP-format <mention> tag. Off by default
+  // so non-comment editors (e.g. the description field on a fresh task) don't
+  // surprise users with a popup.
+  mentionUsers,
 }) {
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
+  // The suggestion plugin needs the latest users list on every keystroke,
+  // but rebuilding the Tiptap extension chain on each list refetch would
+  // recreate the editor and drop the caret/draft. Stash the list on a ref
+  // that's only read inside the suggestion's items callback (event-time, not
+  // render-time). The lint rule about refs-during-render fires on the
+  // *passing* of the getter, not on its execution — disable just that line.
+  const usersRef = useRef(mentionUsers || []);
+  useEffect(() => {
+    usersRef.current = mentionUsers || [];
+  }, [mentionUsers]);
+
+  // Mention is opt-in: only added when the caller passes `mentionUsers`.
+  const mentionsEnabled = mentionUsers !== undefined;
+  const extensions = useMemo(() => {
+    const base = [
       StarterKit.configure({
         // We render headings 1-3 only — h4+ rarely fit in narrow comment
         // panels and tend to look identical to bold paragraph text.
@@ -73,7 +91,21 @@ export function RichTextEditor({
           },
         },
       }),
-    ],
+    ];
+    if (mentionsEnabled) {
+      base.push(
+        OpMention.configure({
+          // eslint-disable-next-line react-hooks/refs
+          suggestion: buildMentionSuggestion(() => usersRef.current),
+        }),
+      );
+    }
+    return base;
+  }, [mentionsEnabled]);
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions,
     content: value || "",
     editable: !disabled,
     editorProps: {
