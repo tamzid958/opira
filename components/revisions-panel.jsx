@@ -27,10 +27,12 @@ export function RevisionsPanel({ wpId }) {
     // syntax matches what OP actually parses.
     const idForHint = String(wpId || "").replace(/^wp-/, "");
     return (
-      <div className="text-[13px] text-fg-subtle text-center py-3">
-        No linked commits. Reference this issue from a commit message
-        (e.g. <code className="font-mono text-[11.5px] px-1 py-px rounded bg-surface-subtle">fixes #{idForHint}</code>)
-        to see it here.
+      <div className="text-[12px] text-fg-subtle py-1.5">
+        No commits. Reference{" "}
+        <code className="font-mono text-[11px] px-1 py-px rounded bg-surface-subtle">
+          fixes #{idForHint}
+        </code>{" "}
+        in a commit to link it.
       </div>
     );
   }

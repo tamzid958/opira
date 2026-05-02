@@ -23,6 +23,7 @@ import { RelationsPanel } from "@/components/relations-panel";
 import { ActivityItem } from "@/components/activity-item";
 import { AttachmentsGrid } from "@/components/attachments-grid";
 import { FileLinksPanel } from "@/components/file-links-panel";
+import { GithubPanel } from "@/components/github-panel";
 import { RevisionsPanel } from "@/components/revisions-panel";
 import { WatcherButton } from "@/components/watcher-button";
 import { TimeEntriesPanel } from "@/components/time-entries-panel";
@@ -40,6 +41,9 @@ import {
   useCustomOptions,
   usePostComment,
   useUpdateComment,
+  useWpFileLinks,
+  useWpGithubPullRequests,
+  useWpRevisions,
   useWpSchema,
 } from "@/lib/hooks/use-openproject-detail";
 
@@ -233,6 +237,7 @@ export function TaskDetail({
   const wpId = task?.nativeId;
 
   const [tab, setTab] = useState("comments");
+  const [devTab, setDevTab] = useState("files");
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleVal, setTitleVal] = useState(task?.title ?? "");
   const [editingDesc, setEditingDesc] = useState(false);
@@ -252,6 +257,15 @@ export function TaskDetail({
   const commentText = watch("comment") || "";
 
   const activities = useActivities(wpId);
+  // Counts fetched here drive the Development tab labels; TanStack dedupes
+  // these against the same queries inside the panels (shared queryKey),
+  // so the network cost is one round-trip per resource.
+  const fileLinksQ = useWpFileLinks(wpId);
+  const githubPrsQ = useWpGithubPullRequests(wpId);
+  const revisionsQ = useWpRevisions(wpId);
+  const fileLinksCount = fileLinksQ.data?.length || 0;
+  const githubPrsCount = githubPrsQ.data?.length || 0;
+  const revisionsCount = revisionsQ.data?.length || 0;
   const carryoverQ = useCarryover(projectId, !!projectId);
   const carryOver = wpId
     ? carryoverQ.data?.byWpId?.[String(wpId)] || null
@@ -633,20 +647,42 @@ export function TaskDetail({
             <AttachmentsGrid wpId={wpId} canAdd={canAddAttachment} />
           </section>
 
-          {/* External file links (Nextcloud / OneDrive) */}
+          {/* Development — files / PRs / commits collapsed into one tabbed
+              section so an empty instance doesn't show three stacked empty
+              states. Counts on the labels signal where content lives. */}
           <section className="mb-6">
-            <div className="text-[11px] font-semibold text-fg-subtle uppercase tracking-wider mb-2">
-              Linked files
+            <div className="flex items-center gap-3 mb-2">
+              <div className="text-[11px] font-semibold text-fg-subtle uppercase tracking-wider">
+                Development
+              </div>
+              <div className="flex gap-0.5 border-b border-border-soft flex-1 -mb-px">
+                {[
+                  { id: "files", label: "Files", count: fileLinksCount },
+                  { id: "prs", label: "Pull requests", count: githubPrsCount },
+                  { id: "commits", label: "Commits", count: revisionsCount },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setDevTab(t.id)}
+                    className={cn(
+                      "px-2.5 py-1.5 text-[12px] cursor-pointer border-b-2 -mb-px transition-colors",
+                      devTab === t.id
+                        ? "text-accent-700 border-accent font-semibold"
+                        : "text-fg-subtle border-transparent hover:text-fg font-medium",
+                    )}
+                  >
+                    {t.label}
+                    {t.count > 0 ? (
+                      <span className="ml-1 text-fg-subtle font-normal">· {t.count}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
             </div>
-            <FileLinksPanel wpId={wpId} />
-          </section>
-
-          {/* Linked SCM commits (Revisions) */}
-          <section className="mb-6">
-            <div className="text-[11px] font-semibold text-fg-subtle uppercase tracking-wider mb-2">
-              Linked commits
-            </div>
-            <RevisionsPanel wpId={wpId} />
+            {devTab === "files" && <FileLinksPanel wpId={wpId} />}
+            {devTab === "prs" && <GithubPanel wpId={wpId} />}
+            {devTab === "commits" && <RevisionsPanel wpId={wpId} />}
           </section>
 
           {/* Activity tabs */}

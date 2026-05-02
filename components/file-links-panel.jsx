@@ -25,9 +25,11 @@ export function FileLinksPanel({ wpId }) {
   if (q.isLoading) return <LoadingPill label="loading file links" />;
   if (links.length === 0) {
     return (
-      <div className="text-[13px] text-fg-subtle text-center py-3">
-        No linked files. Link a Nextcloud or OneDrive file from OpenProject&apos;s storage
-        integration.
+      <div
+        className="text-[12px] text-fg-subtle py-1.5"
+        title="Link a Nextcloud or OneDrive file from OpenProject's storage integration."
+      >
+        No linked files yet.
       </div>
     );
   }
