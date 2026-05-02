@@ -1,30 +1,11 @@
 import { opFetch, opPatchWithLock } from "@/lib/openproject/client";
 import { errorResponse, nativeId } from "@/lib/openproject/route-utils";
-import {
-  buildPatchBody,
-  elementsOf,
-  mapPriority,
-  mapStatus,
-  mapType,
-  mapWorkPackage,
-} from "@/lib/openproject/mappers";
+import { buildPatchBody, mapWorkPackage } from "@/lib/openproject/mappers";
+import { loadLookups } from "@/lib/openproject/lookups";
 import { htmlToMarkdown } from "@/lib/openproject/description";
 import { resolveOptionForLabel, FIELD as SP_FIELD } from "@/lib/openproject/story-points";
 
 export const dynamic = "force-dynamic";
-
-async function loadLookups() {
-  const [statusesHal, typesHal, prioritiesHal] = await Promise.all([
-    opFetch("/statuses").catch(() => null),
-    opFetch("/types").catch(() => null),
-    opFetch("/priorities").catch(() => null),
-  ]);
-  return {
-    statuses: elementsOf(statusesHal).map(mapStatus),
-    types: elementsOf(typesHal).map(mapType),
-    priorities: elementsOf(prioritiesHal).map(mapPriority),
-  };
-}
 
 export async function GET(_req, ctx) {
   try {

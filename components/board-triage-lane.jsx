@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { Icon, TypeIcon } from "@/components/icons";
+import { Icon } from "@/components/icons";
+import { TaskTypeIcon } from "@/components/ui/task-meta";
 import { PEOPLE } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
@@ -98,7 +99,7 @@ function TriageChip({ task, onOpen }) {
         "hover:border-border-strong hover:bg-surface-subtle transition-colors",
       )}
     >
-      <TypeIcon name={task.typeName} color={task.typeColor} size={12} />
+      <TaskTypeIcon task={task} size={12} />
       <span className="font-mono text-[11px] text-fg-subtle">{task.key}</span>
       <span className="text-[12px] text-fg max-w-50 truncate">{task.title}</span>
       <Avatar user={null} size="sm" />

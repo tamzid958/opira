@@ -1,5 +1,6 @@
 import { buildFilters, fetchAllPages } from "@/lib/openproject/client";
 import { mapWorkPackage } from "@/lib/openproject/mappers";
+import { loadLookups } from "@/lib/openproject/lookups";
 import { errorResponse } from "@/lib/openproject/route-utils";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +29,13 @@ export async function GET(req, ctx) {
     }
     const filtersJson = buildFilters(filters);
 
-    const [now, then] = await Promise.all([
+    const [now, then, lookups] = await Promise.all([
       fetchAllPages("/work_packages", { filters: filtersJson }),
       fetchAllPages("/work_packages", {
         filters: filtersJson,
         timestamps: since,
       }),
+      loadLookups(id),
     ]);
     const nowMap = new Map(now.map((wp) => [String(wp.id), wp]));
     const thenMap = new Map(then.map((wp) => [String(wp.id), wp]));
@@ -44,7 +46,7 @@ export async function GET(req, ctx) {
     for (const [k, wp] of nowMap) {
       const prev = thenMap.get(k);
       if (!prev) {
-        added.push(mapWorkPackage(wp));
+        added.push(mapWorkPackage(wp, lookups));
         continue;
       }
       const titleDiff = (wp.subject || "") !== (prev.subject || "");
@@ -52,14 +54,14 @@ export async function GET(req, ctx) {
         wp._links?.status?.href !== prev._links?.status?.href;
       if (titleDiff || statusDiff) {
         changed.push({
-          before: mapWorkPackage(prev),
-          after: mapWorkPackage(wp),
+          before: mapWorkPackage(prev, lookups),
+          after: mapWorkPackage(wp, lookups),
           fields: [titleDiff && "title", statusDiff && "status"].filter(Boolean),
         });
       }
     }
     for (const [k, wp] of thenMap) {
-      if (!nowMap.has(k)) removed.push(mapWorkPackage(wp));
+      if (!nowMap.has(k)) removed.push(mapWorkPackage(wp, lookups));
     }
     return Response.json({ since, added, removed, changed });
   } catch (e) {

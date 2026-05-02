@@ -13,6 +13,7 @@ import {
   useCategories,
 } from "@/lib/hooks/use-openproject-detail";
 import { friendlyError } from "@/lib/api-client";
+import { findById } from "@/lib/utils";
 
 const SORTS = [
   { id: "usage", label: "Most used" },
@@ -185,9 +186,8 @@ export function Tags({ projectId, projectName, tasks, onFilter }) {
 
   const lookupAssignee = (cat) => {
     if (!cat.defaultAssignee) return null;
-    const list = assigneesQ.data || [];
     return (
-      list.find((x) => String(x.id) === String(cat.defaultAssignee)) ||
+      findById(assigneesQ.data, cat.defaultAssignee) ||
       (cat.defaultAssigneeName
         ? { id: cat.defaultAssignee, name: cat.defaultAssigneeName }
         : null)

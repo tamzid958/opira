@@ -6,7 +6,7 @@ import { friendlyError } from "@/lib/api-client";
 import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/icons";
 import { LoadingPill } from "@/components/ui/loading-pill";
-import { StatusPill } from "@/components/ui/status-pill";
+import { TaskStatusPill } from "@/components/ui/task-meta";
 import { formatEstimate } from "@/lib/openproject/estimate";
 import {
   useDeleteQuery,
@@ -125,13 +125,7 @@ export function SavedQueryView({ queryId, projectId }) {
                 <span className="text-[11px] font-mono text-fg-subtle">{wp.key}</span>
                 <span className="text-[13px] text-fg truncate">{wp.title || "(untitled)"}</span>
                 <span>
-                  {wp.statusName ? (
-                    <StatusPill
-                      name={wp.statusName}
-                      isClosed={!!wp.statusIsClosed}
-                      color={wp.statusColor}
-                    />
-                  ) : null}
+                  <TaskStatusPill task={wp} />
                 </span>
                 <Avatar user={assignee} size="sm" />
                 <span className="text-right font-mono text-xs tabular-nums text-fg-muted">

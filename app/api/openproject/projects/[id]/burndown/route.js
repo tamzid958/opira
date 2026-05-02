@@ -2,7 +2,6 @@ import { buildFilters, fetchAllPages, opFetch } from "@/lib/openproject/client";
 import {
   elementsOf,
   mapActivity,
-  mapStatus,
   mapVersionFull,
   mapWorkPackage,
 } from "@/lib/openproject/mappers";
@@ -10,7 +9,7 @@ import {
   classifyVersionDetail,
   closedSprintMentions,
 } from "@/lib/openproject/activity-parsing";
-import { isTaskClosed } from "@/lib/openproject/task-state";
+import { loadLookups } from "@/lib/openproject/lookups";
 import { errorResponse } from "@/lib/openproject/route-utils";
 import { makeCache } from "@/lib/openproject/route-cache";
 import { isoDayOf, workingDaySet } from "@/lib/openproject/working-days";
@@ -50,27 +49,27 @@ async function computeBurndown(projectId, sprintId) {
     };
   }
 
-  const [versionsHal, statusesHal] = await Promise.all([
-    opFetch(`/projects/${encodeURIComponent(projectId)}/versions`).catch(() => null),
-    opFetch("/statuses").catch(() => null),
-  ]);
-  const allVersions = elementsOf(versionsHal).map(mapVersionFull);
-  const statuses = elementsOf(statusesHal).map(mapStatus);
-  const closedSprintNames = allVersions
-    .filter((s) => s.status === "closed" && String(s.id) !== String(sprintId))
-    .map((s) => s.name)
-    .filter(Boolean);
-
   const filters = buildFilters([
     { version: { operator: "=", values: [sprintId] } },
   ]);
 
-  // Current sprint members — points-of-truth for "what's in the sprint now".
-  const currentEls = await fetchAllPages(
-    `/projects/${encodeURIComponent(projectId)}/work_packages`,
-    { filters },
-  );
-  const currentWps = currentEls.map((wp) => mapWorkPackage(wp));
+  // Fan out the heavy fetches in parallel: versions list (for closed-sprint
+  // mentions), the per-task lookup tables (cached), and the current sprint
+  // members.
+  const [versionsHal, lookups, currentEls] = await Promise.all([
+    opFetch(`/projects/${encodeURIComponent(projectId)}/versions`).catch(() => null),
+    loadLookups(projectId),
+    fetchAllPages(
+      `/projects/${encodeURIComponent(projectId)}/work_packages`,
+      { filters },
+    ),
+  ]);
+  const allVersions = elementsOf(versionsHal).map(mapVersionFull);
+  const closedSprintNames = allVersions
+    .filter((s) => s.status === "closed" && String(s.id) !== String(sprintId))
+    .map((s) => s.name)
+    .filter(Boolean);
+  const currentWps = currentEls.map((wp) => mapWorkPackage(wp, lookups));
 
   // Estimation mode: schema is the source of truth (the OP admin configured
   // a CustomOption / Float / Integer field, or none, on this project's
@@ -93,7 +92,7 @@ async function computeBurndown(projectId, sprintId) {
       `/projects/${encodeURIComponent(projectId)}/work_packages`,
       { filters, timestamps: baselineTs },
     );
-    baselineWps = baselineEls.map((wp) => mapWorkPackage(wp));
+    baselineWps = baselineEls.map((wp) => mapWorkPackage(wp, lookups));
   } catch {
     baselineWps = null;
     baselineSource = "fallback";
@@ -295,7 +294,7 @@ async function computeBurndown(projectId, sprintId) {
   // journal retention window, or activities fetch was capped). Anchor them
   // at sprint.start so they're excluded from every day's remaining.
   for (const t of currentWps) {
-    if (isTaskClosed(t, statuses) && !doneBy.has(t.nativeId)) {
+    if (t.statusIsClosed && !doneBy.has(t.nativeId)) {
       doneBy.set(t.nativeId, sprint.start);
     }
   }
@@ -304,7 +303,7 @@ async function computeBurndown(projectId, sprintId) {
   // ensure remaining counts them. Without this, a stray "done" mention in
   // a comment could permanently remove the WP from the burndown.
   for (const t of currentWps) {
-    if (!isTaskClosed(t, statuses) && doneBy.has(t.nativeId)) {
+    if (!t.statusIsClosed && doneBy.has(t.nativeId)) {
       doneBy.delete(t.nativeId);
     }
   }

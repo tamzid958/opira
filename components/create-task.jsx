@@ -9,9 +9,10 @@ import { Menu } from "@/components/ui/menu";
 import { TagPill } from "@/components/ui/tag-pill";
 import { Icon, PriorityIcon, TypeIcon } from "@/components/icons";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { TShirtPicker } from "@/components/tshirt-picker";
 import { PEOPLE } from "@/lib/data";
 import { useCustomOptions, useWpSchema } from "@/lib/hooks/use-openproject-detail";
-import { cn } from "@/lib/utils";
+import { cn, findById } from "@/lib/utils";
 
 const schema = z.object({
   type: z.string().min(1, "Pick a type"),
@@ -81,6 +82,44 @@ function TypeStrip({ types, value, onChange }) {
   );
 }
 
+// Compact Fibonacci button row for numeric story-point fields. Mirrors
+// TShirtPicker's geometry so the two pickers feel consistent regardless of
+// which estimation mode the project is on.
+const FIB_SCALE = [1, 2, 3, 5, 8, 13, 21];
+
+function NumericPointsPicker({ value, onChange }) {
+  return (
+    <div className="inline-flex gap-0.5">
+      {FIB_SCALE.map((n) => {
+        const active = value === n;
+        return (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            className={cn(
+              "min-w-6 h-6 px-1.5 rounded text-[10.5px] font-semibold transition-colors cursor-pointer tabular-nums",
+              active
+                ? "bg-accent text-on-accent"
+                : "bg-surface-muted text-fg-muted border border-transparent hover:bg-surface-subtle hover:border-border",
+            )}
+          >
+            {n}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        title="Clear"
+        className="min-w-6 h-6 px-1.5 rounded text-[10.5px] font-semibold text-fg-subtle bg-transparent border border-transparent hover:bg-surface-subtle"
+      >
+        —
+      </button>
+    </div>
+  );
+}
+
 export function CreateTask({
   onClose,
   onCreate,
@@ -99,7 +138,6 @@ export function CreateTask({
   const [createMore, setCreateMore] = useState(false);
   const [assignMenu, setAssignMenu] = useState(null);
   const [priorityMenu, setPriorityMenu] = useState(null);
-  const [pointsMenu, setPointsMenu] = useState(null);
   const [sprintMenu, setSprintMenu] = useState(null);
   const [epicMenu, setEpicMenu] = useState(null);
   const [labelMenu, setLabelMenu] = useState(null);
@@ -200,9 +238,7 @@ export function CreateTask({
   };
 
   const selectedAssignee = assignee
-    ? (Array.isArray(assignees) ? assignees : []).find(
-        (p) => String(p.id) === String(assignee),
-      ) ||
+    ? findById(assignees, assignee) ||
       PEOPLE[assignee] ||
       { id: assignee, name: "Assignee" }
     : null;
@@ -211,9 +247,7 @@ export function CreateTask({
     ? sprints.find((s) => s.id === sprint)?.name || null
     : null;
 
-  const selectedEpic = epicId
-    ? epics.find((e) => String(e.id) === String(epicId))
-    : null;
+  const selectedEpic = epicId ? findById(epics, epicId) : null;
 
   const selectedTag = (watch("labels") || [])[0] || null;
 
@@ -223,10 +257,8 @@ export function CreateTask({
       )?.value || null
     : points || null;
 
-  const priorityRecord =
-    (priorities || []).find((p) => String(p.id) === String(priority)) || null;
+  const priorityRecord = findById(priorities, priority);
   const priorityLabel = priorityRecord?.name || "";
-  const priorityCount = (priorities || []).length;
 
   return (
     <div
@@ -381,7 +413,7 @@ export function CreateTask({
                     name={priorityRecord?.name}
                     color={priorityRecord?.color}
                     position={priorityRecord?.position}
-                    totalPositions={priorityCount}
+                    totalPositions={(priorities || []).length}
                     size={13}
                   />
                   <span className="truncate">{priorityLabel || "Select"}</span>
@@ -448,70 +480,34 @@ export function CreateTask({
                 </div>
               )}
 
-              {/* Story points — hidden when the project is on duration mode. */}
+              {/* Story points — hidden when the project is on duration mode.
+                  CustomOption schemas (t-shirt sizes) render as compact
+                  inline buttons so the size is one click instead of a
+                  click-then-pick. Numeric schemas reuse the same compact
+                  button row over the standard Fibonacci scale. */}
               {!(spField === undefined && !schemaQ.isLoading) && (
               <div className={ROW}>
                 <span className={ROW_LABEL}>
                   <Icon name="chart" size={13} aria-hidden="true" />
                   {spField?.name || "Points"}
                 </span>
-                <button
-                  type="button"
-                  className={ROW_VALUE}
-                  onClick={(e) =>
-                    setPointsMenu(e.currentTarget.getBoundingClientRect())
-                  }
-                >
-                  {pointsLabel ? (
-                    <span className="truncate">{pointsLabel}</span>
+                <div className="flex-1 min-w-0">
+                  {spIsCustomOption ? (
+                    <TShirtPicker
+                      value={pointsLabel}
+                      allowed={spOptions || []}
+                      onChange={(label, href) => {
+                        setValue("pointsHref", href);
+                        setValue("points", label);
+                      }}
+                    />
                   ) : (
-                    <span className={ROW_PLACEHOLDER}>Not estimated</span>
+                    <NumericPointsPicker
+                      value={points}
+                      onChange={(n) => setValue("points", n)}
+                    />
                   )}
-                  <Icon
-                    name="chev-down"
-                    size={11}
-                    className="ml-auto text-fg-subtle shrink-0"
-                    aria-hidden="true"
-                  />
-                </button>
-                {pointsMenu && (
-                  <Menu
-                    anchorRect={pointsMenu}
-                    onClose={() => setPointsMenu(null)}
-                    onSelect={(it) => {
-                      if (spIsCustomOption) {
-                        setValue("pointsHref", it.value);
-                        setValue(
-                          "points",
-                          it.label === "Not estimated" ? null : it.label,
-                        );
-                      } else {
-                        setValue("points", it.value);
-                      }
-                    }}
-                    items={
-                      spIsCustomOption
-                        ? [
-                            { label: "Not estimated", value: null },
-                            { divider: true },
-                            ...((spOptions || []).map((o) => ({
-                              label: o.value,
-                              value: o.href || o.id,
-                              active: o.href === pointsHref || o.id === pointsHref,
-                            }))),
-                          ]
-                        : [
-                            { label: "Not estimated", value: null },
-                            { divider: true },
-                            ...[1, 2, 3, 5, 8, 13, 21].map((n) => ({
-                              label: String(n),
-                              value: n,
-                              active: n === points,
-                            })),
-                          ]
-                    }
-                  />
-                )}
+                </div>
               </div>
               )}
 

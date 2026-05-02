@@ -1,6 +1,7 @@
 import { buildFilters, fetchAllPages, opFetch, withQuery } from "@/lib/openproject/client";
-import { elementsOf, mapStatus, mapVersionFull, mapWorkPackage } from "@/lib/openproject/mappers";
-import { isTaskClosed } from "@/lib/openproject/task-state";
+import { elementsOf, mapVersionFull, mapWorkPackage } from "@/lib/openproject/mappers";
+import { loadLookups } from "@/lib/openproject/lookups";
+import { makeCache } from "@/lib/openproject/route-cache";
 import { errorResponse } from "@/lib/openproject/route-utils";
 import {
   getProjectEstimateMode,
@@ -11,19 +12,17 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const TTL_MS = 5 * 60 * 1000;
-const CACHE = new Map();
+const CACHE = makeCache({ ttlMs: 5 * 60 * 1000 });
 
 async function computeVelocity(projectId) {
-  // 1. List all versions on the project, keep the most-recent closed ones.
-  const [versionsHal, statusesHal] = await Promise.all([
+  // 1. List all versions on the project + cached lookups in parallel.
+  const [versionsHal, lookups] = await Promise.all([
     opFetch(
       withQuery(`/projects/${encodeURIComponent(projectId)}/versions`, { pageSize: "200" }),
     ),
-    opFetch("/statuses").catch(() => null),
+    loadLookups(projectId),
   ]);
   const versions = elementsOf(versionsHal).map(mapVersionFull);
-  const statuses = elementsOf(statusesHal).map(mapStatus);
   const closed = versions
     .filter((v) => v.status === "closed" && v.end && v.end !== "—")
     .sort((a, b) => (a.end < b.end ? 1 : -1))
@@ -44,7 +43,7 @@ async function computeVelocity(projectId) {
         `/projects/${encodeURIComponent(projectId)}/work_packages`,
         { filters, pageSize: "1" },
       );
-      if (probe.length > 0) sampleWp = mapWorkPackage(probe[0]);
+      if (probe.length > 0) sampleWp = mapWorkPackage(probe[0], lookups);
     } catch {
       // continue with next sprint
     }
@@ -74,7 +73,7 @@ async function computeVelocity(projectId) {
           { filters },
         );
       }
-      const wps = wpEls.map((wp) => mapWorkPackage(wp));
+      const wps = wpEls.map((wp) => mapWorkPackage(wp, lookups));
       // Use the project mode (schema-derived) for per-sprint sums so a
       // point-mode project's historical velocity isn't computed as
       // working-day counts on sprints that happen to have unsized WPs.
@@ -82,7 +81,7 @@ async function computeVelocity(projectId) {
       const opts = { mode: sprintMode };
       const committed = wps.reduce((s, t) => s + weightOf(t, opts), 0);
       const completed = wps
-        .filter((t) => isTaskClosed(t, statuses))
+        .filter((t) => t.statusIsClosed)
         .reduce((s, t) => s + weightOf(t, opts), 0);
       return {
         sprintId: v.id,
@@ -112,11 +111,9 @@ export async function GET(_req, ctx) {
   try {
     const { id } = await ctx.params;
     const cached = CACHE.get(id);
-    if (cached && Date.now() - cached.t < TTL_MS) {
-      return Response.json(cached.value);
-    }
+    if (cached) return Response.json(cached);
     const value = await computeVelocity(id);
-    CACHE.set(id, { t: Date.now(), value });
+    CACHE.set(id, value);
     return Response.json(value);
   } catch (e) {
     return errorResponse(e);

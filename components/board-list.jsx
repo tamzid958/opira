@@ -12,12 +12,16 @@ import {
 } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
-import { StatusPill } from "@/components/ui/status-pill";
+import {
+  TaskPriorityIcon,
+  TaskStatusPill,
+  TaskTypeIcon,
+} from "@/components/ui/task-meta";
 import { TagPill } from "@/components/ui/tag-pill";
 import { Menu } from "@/components/ui/menu";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Icon, PriorityIcon, TypeIcon } from "@/components/icons";
+import { Icon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import {
   buildChildIndex,
@@ -99,7 +103,7 @@ function Row({
         <span className="w-4 h-4 shrink-0" aria-hidden="true" />
       )}
 
-      <TypeIcon name={task.typeName} color={task.typeColor} size={14} />
+      <TaskTypeIcon task={task} size={14} />
 
       <span className="font-mono text-[11px] text-fg-faint shrink-0 hidden sm:inline">
         {task.key}
@@ -142,20 +146,11 @@ function Row({
         className={cn("shrink-0", editable ? "cursor-pointer" : "cursor-default")}
         aria-disabled={!editable || undefined}
       >
-        <StatusPill
-          name={task.statusName}
-          isClosed={!!task.statusIsClosed}
-          color={task.statusColor}
-        />
+        <TaskStatusPill task={task} />
       </span>
 
       <span className="hidden md:inline-flex justify-center shrink-0 w-5">
-        <PriorityIcon
-          name={task.priorityName}
-          color={task.priorityColor}
-          position={task.priorityPosition}
-          size={14}
-        />
+        <TaskPriorityIcon task={task} size={14} />
       </span>
 
       <span
@@ -387,7 +382,7 @@ export function BoardList({
       <DragOverlay>
         {activeTask ? (
           <div className="luxe-card flex items-center gap-2 px-3 py-2 max-w-md shadow-lg">
-            <TypeIcon name={activeTask.typeName} color={activeTask.typeColor} size={14} />
+            <TaskTypeIcon task={activeTask} size={14} />
             <span className="font-mono text-[11px] text-fg-faint shrink-0">
               {activeTask.key}
             </span>

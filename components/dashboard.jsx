@@ -9,8 +9,8 @@ import {
   isWithinInterval,
 } from "date-fns";
 import { Avatar } from "@/components/ui/avatar";
-import { StatusPill } from "@/components/ui/status-pill";
-import { TypeIcon, Icon } from "@/components/icons";
+import { Icon } from "@/components/icons";
+import { TaskStatusPill, TaskTypeIcon } from "@/components/ui/task-meta";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { useBurndown } from "@/lib/hooks/use-openproject-detail";
 import { useEstimateMode } from "@/lib/hooks/use-estimate-mode";
@@ -70,16 +70,12 @@ function TodayItem({ task, onClick, now }) {
       className="group flex items-center gap-3 px-4 py-3 border-b border-border-soft last:border-b-0 cursor-pointer transition-colors hover:bg-surface-subtle/60"
       onClick={() => onClick?.(task.id)}
     >
-      <TypeIcon name={task.typeName} color={task.typeColor} size={14} />
+      <TaskTypeIcon task={task} size={14} />
       <span className="font-mono text-[11px] text-fg-faint shrink-0">{task.key}</span>
       <span className="flex-1 min-w-0 truncate text-[13.5px] text-fg">
         {task.title}
       </span>
-      <StatusPill
-        name={task.statusName}
-        isClosed={!!task.statusIsClosed}
-        color={task.statusColor}
-      />
+      <TaskStatusPill task={task} />
       <span
         className={cn(
           "hidden sm:inline text-[11.5px] tabular-nums shrink-0 min-w-[88px] text-right",
@@ -135,7 +131,7 @@ function CadenceCard({ sp, isActive, onOpen }) {
   const stateLabel =
     sp.state === "active" ? "Active" :
     sp.state === "planned" ? "Planned" :
-    sp.status === "closed" ? "Closed" : "—";
+    sp.state === "closed" ? "Closed" : "—";
   const stateTone =
     sp.state === "active" ? "text-fg" :
     sp.state === "planned" ? "text-fg-muted" :

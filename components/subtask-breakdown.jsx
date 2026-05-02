@@ -4,7 +4,7 @@ import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
 import { Avatar } from "@/components/ui/avatar";
-import { StatusPill } from "@/components/ui/status-pill";
+import { TaskStatusPill } from "@/components/ui/task-meta";
 import { Menu } from "@/components/ui/menu";
 import { Icon } from "@/components/icons";
 import { useCreateChild } from "@/lib/hooks/use-openproject-detail";
@@ -13,7 +13,7 @@ import { PEOPLE } from "@/lib/data";
 import { buildChildIndex as buildSliceChildIndex } from "@/lib/openproject/hierarchy";
 import { assigneeMenuItems, statusMenuItems } from "@/lib/openproject/menu-items";
 import { weightOf } from "@/lib/openproject/estimate";
-import { cn } from "@/lib/utils";
+import { cn, findById } from "@/lib/utils";
 
 const buildChildIndex = (allTasks) =>
   buildSliceChildIndex(allTasks, { filterToSlice: false });
@@ -42,7 +42,7 @@ function SubtaskRow({
   const sprintList = Array.isArray(sprints) ? sprints : [];
   const taskSprintLabel = (() => {
     if (!task.sprint) return null;
-    const sp = sprintList.find((s) => String(s.id) === String(task.sprint));
+    const sp = findById(sprintList, task.sprint);
     return sp?.name?.split(" — ")[0] || task.sprintName || "Sprint";
   })();
 
@@ -143,11 +143,7 @@ function SubtaskRow({
           className={editable ? "cursor-pointer" : "cursor-default"}
           aria-disabled={!editable || undefined}
         >
-          <StatusPill
-            name={task.statusName}
-            isClosed={!!task.statusIsClosed}
-            color={task.statusColor}
-          />
+          <TaskStatusPill task={task} />
         </span>
 
         <span
@@ -212,12 +208,12 @@ function SubtaskRow({
           anchorRect={statusMenu}
           onClose={() => setStatusMenu(null)}
           onSelect={(it) => {
-            const target = (statuses || []).find((s) => String(s.id) === String(it.value));
-            if (target) {
-              updateSub({ statusId: target.id, statusName: target.name });
-            } else {
-              updateSub({ statusId: it.value });
-            }
+            const target = findById(statuses, it.value);
+            updateSub(
+              target
+                ? { statusId: target.id, statusName: target.name }
+                : { statusId: it.value },
+            );
             onChange?.("Sub-task status updated");
           }}
           items={statusMenuItems(statuses, task.statusId)}
@@ -243,7 +239,7 @@ function SubtaskRow({
           onClose={() => setSprintMenu(null)}
           onSelect={(it) => {
             updateSub({ sprint: it.value });
-            const target = sprintList.find((s) => String(s.id) === String(it.value));
+            const target = findById(sprintList, it.value);
             onChange?.(
               it.value
                 ? `Moved to ${target?.name?.split(" — ")[0] || "sprint"}`

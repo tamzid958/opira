@@ -9,6 +9,7 @@ import {
   useUpdateVersion,
 } from "@/lib/hooks/use-openproject-detail";
 import { useUpdateTask } from "@/lib/hooks/use-openproject";
+import { buildClosedStatusIdSet } from "@/lib/openproject/task-state";
 import { CreateSprintModal } from "@/components/create-sprint";
 import { formatEstimate, weightOf } from "@/lib/openproject/estimate";
 import { cn } from "@/lib/utils";
@@ -32,13 +33,10 @@ export function CompleteSprintModal({
   const createVersion = useCreateVersion(projectId);
   const [busy, setBusy] = useState(false);
 
-  const closedStatusIds = useMemo(() => {
-    const set = new Set();
-    for (const s of statuses || []) {
-      if (s?.isClosed) set.add(String(s.id));
-    }
-    return set;
-  }, [statuses]);
+  const closedStatusIds = useMemo(
+    () => buildClosedStatusIdSet(statuses),
+    [statuses],
+  );
 
   const inSprint = tasks.filter((t) => t.sprint === sprint.id);
   const open = inSprint.filter(

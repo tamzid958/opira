@@ -34,6 +34,7 @@ import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
 import { useSavedViews } from "@/lib/hooks/use-saved-views";
 import { pickSprintByDate } from "@/lib/hooks/use-active-sprint";
 import { friendlyError } from "@/lib/api-client";
+import { findById } from "@/lib/utils";
 
 export default function BoardPage({ params: paramsPromise }) {
   const { projectId } = use(paramsPromise);
@@ -316,9 +317,7 @@ export default function BoardPage({ params: paramsPromise }) {
 
   const moveTaskByStatusId = (id, statusId) => {
     const t = tasks.find((x) => x.id === id);
-    const target = (statusesQ.data || []).find(
-      (s) => String(s.id) === String(statusId),
-    );
+    const target = findById(statusesQ.data, statusId);
     updateTaskMutation.mutate(
       {
         id,
@@ -481,8 +480,7 @@ export default function BoardPage({ params: paramsPromise }) {
           activeLabel:
             v === "all"
               ? "Assignee"
-              : (assigneesQ.data || []).find((u) => String(u.id) === String(v))
-                  ?.name || "Assignee",
+              : findById(assigneesQ.data, v)?.name || "Assignee",
         };
       }
       case "type": {
@@ -493,7 +491,7 @@ export default function BoardPage({ params: paramsPromise }) {
           activeLabel:
             v === "all"
               ? "Type"
-              : (typesQ.data || []).find((t) => String(t.id) === String(v))?.name || v,
+              : findById(typesQ.data, v)?.name || v,
         };
       }
       case "label": {
@@ -512,8 +510,7 @@ export default function BoardPage({ params: paramsPromise }) {
           activeLabel:
             v === "all"
               ? "Status"
-              : (statusesQ.data || []).find((s) => String(s.id) === String(v))
-                  ?.name || "Status",
+              : findById(statusesQ.data, v)?.name || "Status",
         };
       }
       default:

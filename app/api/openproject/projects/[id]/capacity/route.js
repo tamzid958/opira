@@ -12,6 +12,7 @@ import {
   mapWorkPackage,
   mapWorkingHours,
 } from "@/lib/openproject/mappers";
+import { loadLookups } from "@/lib/openproject/lookups";
 import { errorResponse } from "@/lib/openproject/route-utils";
 import { makeCache } from "@/lib/openproject/route-cache";
 import { isoDayOf, workingDaySet } from "@/lib/openproject/working-days";
@@ -57,8 +58,10 @@ async function computeCapacity(projectId, sprintId) {
     { version: { operator: "=", values: [sprintId] } },
   ]);
 
-  // Sprint, memberships, and WPs are independent — fetch in parallel.
-  const [v, memberHal, wpEls] = await Promise.all([
+  // Sprint, memberships, WPs, and per-task lookups are independent — fetch
+  // in parallel. Lookups feed `mapWorkPackage` so each WP carries
+  // statusIsClosed / colors without a per-task linear scan.
+  const [v, memberHal, wpEls, lookups] = await Promise.all([
     opFetch(`/versions/${sprintId}`),
     opFetch(withQuery("/memberships", { filters: projectFilter, pageSize: "200" }))
       .catch(() => null),
@@ -66,6 +69,7 @@ async function computeCapacity(projectId, sprintId) {
       `/projects/${encodeURIComponent(projectId)}/work_packages`,
       { filters: sprintFilter },
     ),
+    loadLookups(projectId),
   ]);
 
   const sprint = mapVersionFull(v);
@@ -105,7 +109,7 @@ async function computeCapacity(projectId, sprintId) {
     }),
   );
 
-  const wps = wpEls.map((wp) => mapWorkPackage(wp));
+  const wps = wpEls.map((wp) => mapWorkPackage(wp, lookups));
   const ratio = hoursPerPoint();
   const schemaMode = await getProjectEstimateMode(projectId, wps[0], opFetch);
   const mode = schemaMode || inferModeFromTasks(wps) || "numeric";

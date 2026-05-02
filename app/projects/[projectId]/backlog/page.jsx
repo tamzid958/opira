@@ -34,10 +34,7 @@ import {
 import { usePermissionWithLoading } from "@/lib/hooks/use-permissions";
 import { PERM } from "@/lib/openproject/permission-keys";
 import { resolveApiPatch, runBatched } from "@/lib/openproject/resolve-patch";
-import {
-  buildClosedStatusIdSet,
-  isTaskClosed,
-} from "@/lib/openproject/task-state";
+import { buildClosedStatusIdSet } from "@/lib/openproject/task-state";
 import {
   inferModeFromTasks,
   unitFor,
@@ -47,6 +44,7 @@ import { useEstimateMode } from "@/lib/hooks/use-estimate-mode";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
 import { fetchJson, friendlyError } from "@/lib/api-client";
+import { findById } from "@/lib/utils";
 
 const OVERDUE_SPRINT_BANNER_LIMIT = 2;
 
@@ -249,9 +247,7 @@ export default function BacklogPage({ params: paramsPromise }) {
 
   const moveTaskByStatusId = (id, statusId) => {
     const t = tasks.find((x) => x.id === id);
-    const target = (statusesQ.data || []).find(
-      (s) => String(s.id) === String(statusId),
-    );
+    const target = findById(statusesQ.data, statusId);
     updateTaskMutation.mutate({
       id,
       patch: { statusId, statusName: target?.name },
@@ -478,7 +474,7 @@ export default function BacklogPage({ params: paramsPromise }) {
           activeLabel:
             v === "all"
               ? "Type"
-              : (typesQ.data || []).find((t) => String(t.id) === String(v))?.name || v,
+              : findById(typesQ.data, v)?.name || v,
         };
       }
       case "label": {
@@ -511,9 +507,7 @@ export default function BacklogPage({ params: paramsPromise }) {
           activeLabel:
             v === "all"
               ? "Assignee"
-              : (assigneesQ.data || []).find(
-                  (u) => String(u.id) === String(v),
-                )?.name || "Assignee",
+              : findById(assigneesQ.data, v)?.name || "Assignee",
         };
       }
       default:
@@ -971,8 +965,7 @@ export default function BacklogPage({ params: paramsPromise }) {
             }}
             onBulkSetType={async (ids, typeId) => {
               const typeName =
-                (typesQ.data || []).find((t) => String(t.id) === String(typeId))?.name ||
-                typeId;
+                findById(typesQ.data, typeId)?.name || typeId;
               const pending = toast.loading(
                 `Updating type for ${ids.length} ${ids.length === 1 ? "issue" : "issues"}…`,
               );

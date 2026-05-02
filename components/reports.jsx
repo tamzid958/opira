@@ -5,7 +5,8 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 import { Avatar } from "@/components/ui/avatar";
 import { LoadingPill } from "@/components/ui/loading-pill";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Icon, TypeIcon } from "@/components/icons";
+import { Icon } from "@/components/icons";
+import { TaskTypeIcon } from "@/components/ui/task-meta";
 import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { useBurndown, useVelocity } from "@/lib/hooks/use-openproject-detail";
 import { workingDaySet } from "@/lib/openproject/working-days";
@@ -1136,7 +1137,7 @@ function TypeBreakdown({ tasks }) {
               style={{ gridTemplateColumns: "minmax(0, 96px) 1fr 70px" }}
             >
               <div className="inline-flex items-center gap-1.5">
-                <TypeIcon name={r.typeName} color={r.typeColor} size={14} />
+                <TaskTypeIcon task={r} size={14} />
                 <span className="text-[12.5px] text-fg-muted truncate">{r.label}</span>
               </div>
               <div className="relative h-5 rounded-md bg-surface-app overflow-hidden">

@@ -17,12 +17,9 @@ import { opFetch, opPatchWithLock } from "@/lib/openproject/client";
 import {
   buildCreateBody,
   buildPatchBody,
-  elementsOf,
-  mapPriority,
-  mapStatus,
-  mapType,
   mapWorkPackage,
 } from "@/lib/openproject/mappers";
+import { loadLookups } from "@/lib/openproject/lookups";
 import {
   resolveOptionForLabel,
   FIELD as SP_FIELD,
@@ -32,22 +29,6 @@ import { publish } from "@/lib/server/event-bus";
 function nativeId(id) {
   const s = String(id);
   return s.startsWith("wp-") ? s.slice(3) : s;
-}
-
-async function loadLookups(projectId) {
-  const typesPath = projectId
-    ? `/projects/${encodeURIComponent(projectId)}/types`
-    : "/types";
-  const [statusesHal, typesHal, prioritiesHal] = await Promise.all([
-    opFetch("/statuses").catch(() => null),
-    opFetch(typesPath).catch(() => null),
-    opFetch("/priorities").catch(() => null),
-  ]);
-  return {
-    statuses: elementsOf(statusesHal).map(mapStatus),
-    types: elementsOf(typesHal).map(mapType),
-    priorities: elementsOf(prioritiesHal).map(mapPriority),
-  };
 }
 
 // Translate a thrown OpError into a serialisable object so the client

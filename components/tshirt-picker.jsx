@@ -15,7 +15,7 @@ export function TShirtPicker({ value, onChange, allowed }) {
   }));
 
   return (
-    <div className="inline-flex gap-1">
+    <div className="inline-flex gap-0.5">
       {options.map((o) => {
         const active = value === o.value;
         return (
@@ -25,7 +25,7 @@ export function TShirtPicker({ value, onChange, allowed }) {
             onClick={() => onChange?.(o.value, o.href)}
             title={`${T_SHIRT_TO_POINTS[String(o.value).toUpperCase()] ?? "?"} pts`}
             className={cn(
-              "min-w-7 h-7 px-2 rounded-md text-[11px] font-semibold uppercase tracking-wider transition-colors cursor-pointer",
+              "min-w-6 h-6 px-1.5 rounded text-[10.5px] font-semibold uppercase tracking-wider transition-colors cursor-pointer",
               active
                 ? "bg-accent text-on-accent"
                 : "bg-surface-muted text-fg-muted border border-transparent hover:bg-surface-subtle hover:border-border",
@@ -39,7 +39,7 @@ export function TShirtPicker({ value, onChange, allowed }) {
         type="button"
         onClick={() => onChange?.(null, null)}
         title="Clear"
-        className="min-w-7 h-7 px-2 rounded-md text-[11px] font-semibold text-fg-subtle bg-transparent border border-transparent hover:bg-surface-subtle"
+        className="min-w-6 h-6 px-1.5 rounded text-[10.5px] font-semibold text-fg-subtle bg-transparent border border-transparent hover:bg-surface-subtle"
       >
         —
       </button>

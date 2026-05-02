@@ -11,16 +11,20 @@ import {
 } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
-import { StatusPill } from "@/components/ui/status-pill";
+import {
+  TaskPriorityIcon,
+  TaskStatusPill,
+  TaskTypeIcon,
+} from "@/components/ui/task-meta";
 import { Menu } from "@/components/ui/menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TagPill } from "@/components/ui/tag-pill";
-import { Icon, PriorityIcon, TypeIcon } from "@/components/icons";
+import { Icon } from "@/components/icons";
 import { CarryOverChip } from "@/components/ui/carryover-chip";
 import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { formatEstimate, weightOf } from "@/lib/openproject/estimate";
 import { PEOPLE } from "@/lib/data";
-import { cn, formatAbsDate } from "@/lib/utils";
+import { cn, findById, formatAbsDate } from "@/lib/utils";
 import { buildChildIndex, rootsOf } from "@/lib/openproject/hierarchy";
 import { assigneeMenuItems, statusMenuItems } from "@/lib/openproject/menu-items";
 
@@ -88,7 +92,7 @@ function BacklogRow({
 }) {
   const assigneeList = Array.isArray(assignees) ? assignees : [];
   const assignee =
-    assigneeList.find((u) => String(u.id) === String(task.assignee)) ||
+    findById(assigneeList, task.assignee) ||
     (task.assignee
       ? { id: task.assignee, name: task.assigneeName || "Assignee" }
       : null);
@@ -159,7 +163,7 @@ function BacklogRow({
         </span>
       )}
       <span className="backlog-cell-md">
-        <TypeIcon name={task.typeName} color={task.typeColor} size={14} />
+        <TaskTypeIcon task={task} size={14} />
       </span>
       <span className="flex items-center gap-2 min-w-0">
         <span className="font-mono text-[11px] text-fg-subtle shrink-0">{task.key}</span>
@@ -195,19 +199,10 @@ function BacklogRow({
         className={cn(editable ? "cursor-pointer" : "cursor-default")}
         aria-disabled={!editable || undefined}
       >
-        <StatusPill
-          name={task.statusName}
-          isClosed={!!task.statusIsClosed}
-          color={task.statusColor}
-        />
+        <TaskStatusPill task={task} />
       </span>
       <span className="backlog-cell-md justify-self-center">
-        <PriorityIcon
-          name={task.priorityName}
-          color={task.priorityColor}
-          position={task.priorityPosition}
-          size={14}
-        />
+        <TaskPriorityIcon task={task} size={14} />
       </span>
       <span
         title={`${task.points || 0} story points`}

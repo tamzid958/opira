@@ -12,7 +12,8 @@ import {
 } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
-import { Icon, PriorityIcon, TypeIcon } from "@/components/icons";
+import { Icon } from "@/components/icons";
+import { TaskPriorityIcon, TaskTypeIcon } from "@/components/ui/task-meta";
 import { CarryOverChip } from "@/components/ui/carryover-chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingPill } from "@/components/ui/loading-pill";
@@ -22,7 +23,7 @@ import { BoardCardMenu } from "@/components/board-card-menu";
 import { fetchJson } from "@/lib/api-client";
 import { formatEstimate } from "@/lib/openproject/estimate";
 import { PEOPLE } from "@/lib/data";
-import { cn } from "@/lib/utils";
+import { cn, findById } from "@/lib/utils";
 
 // Pointer-distance threshold before a press becomes a drag — anything below
 // this is treated as a click (open detail or toggle selection). Drops it
@@ -42,9 +43,7 @@ function CardBody({
   estimateMissing,
 }) {
   const assignee = task.assignee
-    ? (Array.isArray(assignees) ? assignees : []).find(
-        (u) => String(u.id) === String(task.assignee),
-      ) ||
+    ? findById(assignees, task.assignee) ||
       PEOPLE[task.assignee] ||
       { id: task.assignee, name: task.assigneeName || "Assignee" }
     : null;
@@ -80,7 +79,7 @@ function CardBody({
       )}
       <div className="flex items-center justify-between mt-1.5">
         <div className="flex items-center gap-1.5">
-          <TypeIcon name={task.typeName} color={task.typeColor} size={14} />
+          <TaskTypeIcon task={task} size={14} />
           <span
             className={cn(
               "font-mono text-[11px] text-fg-subtle font-medium",
@@ -106,12 +105,7 @@ function CardBody({
               <Icon name="comment" size={12} aria-hidden="true" /> {task.comments}
             </span>
           )}
-          <PriorityIcon
-            name={task.priorityName}
-            color={task.priorityColor}
-            position={task.priorityPosition}
-            size={14}
-          />
+          <TaskPriorityIcon task={task} size={14} />
           {formatEstimate(task) != null && (
             <span
               className="px-1.5 py-0.5 rounded-full bg-surface-muted text-[11px] font-medium text-fg-muted"
@@ -906,9 +900,7 @@ export function Board({
               onBulkUpdate
             ) {
               const ids = [...visibleSelected];
-              const target = (statuses || []).find(
-                (s) => String(s.id) === String(targetStatusId),
-              );
+              const target = findById(statuses, targetStatusId);
               onBulkUpdate(ids, {
                 statusId: targetStatusId,
                 statusName: target?.name,

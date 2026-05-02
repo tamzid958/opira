@@ -12,13 +12,17 @@ import {
 } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
-import { StatusPill } from "@/components/ui/status-pill";
+import {
+  TaskPriorityIcon,
+  TaskStatusPill,
+  TaskTypeIcon,
+} from "@/components/ui/task-meta";
 import { TagPill } from "@/components/ui/tag-pill";
 import { Menu } from "@/components/ui/menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Icon, PriorityIcon, TypeIcon } from "@/components/icons";
+import { Icon } from "@/components/icons";
 import { formatEstimate } from "@/lib/openproject/estimate";
-import { cn } from "@/lib/utils";
+import { cn, findById } from "@/lib/utils";
 import {
   buildChildIndex,
   rootsOf,
@@ -41,9 +45,8 @@ function SectionHeader({
   fallbackLabel,
   assignees,
 }) {
-  const list = Array.isArray(assignees) ? assignees : [];
   const parentAssignee = parent?.assignee
-    ? list.find((u) => String(u.id) === String(parent.assignee)) || {
+    ? findById(assignees, parent.assignee) || {
         id: parent.assignee,
         name: parent.assigneeName || "Assignee",
       }
@@ -67,7 +70,7 @@ function SectionHeader({
       </button>
       {parent ? (
         <>
-          <TypeIcon name={parent.typeName} color={parent.typeColor} size={14} />
+          <TaskTypeIcon task={parent} size={14} />
           <button
             type="button"
             onClick={onClickParent}
@@ -76,11 +79,7 @@ function SectionHeader({
           >
             {parent.key}
           </button>
-          <StatusPill
-            name={parent.statusName}
-            isClosed={!!parent.statusIsClosed}
-            color={parent.statusColor}
-          />
+          <TaskStatusPill task={parent} />
           <button
             type="button"
             onClick={onClickParent}
@@ -141,9 +140,8 @@ function Card({
   recentlyUpdated = false,
   fadedByOverlay = false,
 }) {
-  const list = Array.isArray(assignees) ? assignees : [];
   const assignee =
-    list.find((u) => String(u.id) === String(task.assignee)) ||
+    findById(assignees, task.assignee) ||
     (task.assignee ? { id: task.assignee, name: task.assigneeName || "Assignee" } : null);
   const editable = task.permissions?.update !== false;
   const [statusMenu, setStatusMenu] = useState(null);
@@ -195,7 +193,7 @@ function Card({
           + the parent's `flex flex-col`. Border-top keeps it
           visually separated from the title block above. */}
       <div className="mt-auto pt-2 flex items-center gap-2 text-[11px] text-fg-subtle border-t border-border-soft">
-        <TypeIcon name={task.typeName} color={task.typeColor} size={12} />
+        <TaskTypeIcon task={task} size={12} />
         <span
           className={cn(
             "font-mono shrink-0",
@@ -217,19 +215,10 @@ function Card({
           )}
           title={task.statusName}
         >
-          <StatusPill
-            name={task.statusName}
-            isClosed={!!task.statusIsClosed}
-            color={task.statusColor}
-          />
+          <TaskStatusPill task={task} />
         </span>
         <span className="ml-auto inline-flex items-center gap-1.5 shrink-0">
-          <PriorityIcon
-            name={task.priorityName}
-            color={task.priorityColor}
-            position={task.priorityPosition}
-            size={12}
-          />
+          <TaskPriorityIcon task={task} size={12} />
           {formatEstimate(task) != null && (
             <span
               className="px-1.5 py-px rounded-full bg-surface-muted text-[10.5px] font-medium text-fg-muted tabular-nums"
@@ -524,7 +513,7 @@ export function BoardSwimlanes({
       <DragOverlay>
         {activeTask ? (
           <div className="luxe-card flex items-center gap-2 px-3 py-2 max-w-md shadow-lg">
-            <TypeIcon name={activeTask.typeName} color={activeTask.typeColor} size={14} />
+            <TaskTypeIcon task={activeTask} size={14} />
             <span className="font-mono text-[11px] text-fg-faint shrink-0">
               {activeTask.key}
             </span>

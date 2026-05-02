@@ -4,15 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
-import { cn, formatRelDate } from "@/lib/utils";
+import { cn, findById, formatRelDate } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { CommentHtml } from "@/components/ui/comment-html";
-import { StatusPill } from "@/components/ui/status-pill";
+import {
+  TaskPriorityIcon,
+  TaskStatusPill,
+  TaskTypeIcon,
+} from "@/components/ui/task-meta";
 import { Menu } from "@/components/ui/menu";
 import { LoadingPill } from "@/components/ui/loading-pill";
 import { TagPill } from "@/components/ui/tag-pill";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Icon, PriorityIcon, TypeIcon } from "@/components/icons";
+import { Icon } from "@/components/icons";
 import { CarryOverChip } from "@/components/ui/carryover-chip";
 import { SubtaskBreakdown } from "@/components/subtask-breakdown";
 import { RelationsPanel } from "@/components/relations-panel";
@@ -114,7 +118,7 @@ function StatusSelect({ task, statuses, disabled, onUpdate, onChange }) {
       active: String(s.id) === String(task.statusId),
     }));
   const handleSelect = (v) => {
-    const target = (statuses || []).find((s) => String(s.id) === String(v));
+    const target = findById(statuses, v);
     if (target) {
       onUpdate(task.id, { statusId: v, statusName: target.name });
       onChange?.(`Status → ${target.name}`);
@@ -136,11 +140,7 @@ function StatusSelect({ task, statuses, disabled, onUpdate, onChange }) {
         aria-disabled={disabled || undefined}
         className="inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-default disabled:opacity-60 group"
       >
-        <StatusPill
-          name={task.statusName}
-          isClosed={!!task.statusIsClosed}
-          color={task.statusColor}
-        />
+        <TaskStatusPill task={task} />
         {!disabled && (
           <Icon
             name="chev-down"
@@ -410,7 +410,7 @@ export function TaskDetail({
             )}
             <span className="text-fg-faint">/</span>
             <span className="flex items-center gap-1.5 text-fg whitespace-nowrap">
-              <TypeIcon name={task.typeName} color={task.typeColor} size={12} /> {task.key}
+              <TaskTypeIcon task={task} size={12} /> {task.key}
               {carryOver && <CarryOverChip entry={carryOver} />}
             </span>
           </div>
@@ -832,7 +832,7 @@ export function TaskDetail({
                 }}
                 render={() => (
                   <>
-                    <TypeIcon name={task.typeName} color={task.typeColor} size={14} />
+                    <TaskTypeIcon task={task} size={14} />
                     <span className="truncate">{task.typeName || "—"}</span>
                   </>
                 )}
@@ -903,7 +903,7 @@ export function TaskDetail({
                     active: String(p.id) === String(task.priorityId),
                   }))}
                 onChange={(v) => {
-                  const target = (priorities || []).find((p) => String(p.id) === String(v));
+                  const target = findById(priorities, v);
                   if (target) {
                     onUpdate(task.id, {
                       priorityId: v,
@@ -916,13 +916,7 @@ export function TaskDetail({
                 }}
                 render={() => (
                   <>
-                    <PriorityIcon
-                      name={task.priorityName}
-                      color={task.priorityColor}
-                      position={task.priorityPosition}
-                      totalPositions={(priorities || []).length}
-                      size={14}
-                    />
+                    <TaskPriorityIcon task={task} size={14} />
                     <span className="truncate">{task.priorityName || "—"}</span>
                   </>
                 )}

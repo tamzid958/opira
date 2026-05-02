@@ -13,12 +13,13 @@ import {
   startOfMonth,
 } from "date-fns";
 import { CalendarRange } from "lucide-react";
-import { Icon, TypeIcon } from "@/components/icons";
+import { Icon } from "@/components/icons";
+import { TaskTypeIcon } from "@/components/ui/task-meta";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingPill } from "@/components/ui/loading-pill";
 import { PEOPLE } from "@/lib/data";
-import { safeParseISO as safeISO } from "@/lib/utils";
+import { findById, safeParseISO as safeISO } from "@/lib/utils";
 
 // ─── Layout constants ────────────────────────────────────────────
 const ZOOM = {
@@ -53,9 +54,8 @@ const GROUP_OPTIONS = [
 
 function pickAvatar(task, assignees) {
   if (!task.assignee) return null;
-  const list = Array.isArray(assignees) ? assignees : [];
   return (
-    list.find((u) => String(u.id) === String(task.assignee)) ||
+    findById(assignees, task.assignee) ||
     PEOPLE[task.assignee] ||
     { id: task.assignee, name: task.assigneeName || "Assignee" }
   );
@@ -139,10 +139,9 @@ function groupTasks(tasks, mode, { sprints, assignees }) {
   }
 
   if (mode === "assignee") {
-    const aList = Array.isArray(assignees) ? assignees : [];
     for (const t of tasks) {
       const k = t.assignee ? `u-${t.assignee}` : "u-none";
-      const user = aList.find((u) => String(u.id) === String(t.assignee));
+      const user = findById(assignees, t.assignee);
       const label = user?.name || t.assigneeName || (k === "u-none" ? "Unassigned" : "User");
       ensure(k, label, {
         user: user || (t.assignee ? { id: t.assignee, name: label } : null),
@@ -156,8 +155,7 @@ function groupTasks(tasks, mode, { sprints, assignees }) {
   }
 
   if (mode === "status") {
-    // Group by API statusId; closed statuses sort to the end (isClosed truth),
-    // open statuses keep their relative `position` order.
+    // Group by API statusId; closed statuses sort to the end (isClosed truth).
     for (const t of tasks) {
       const k = t.statusId ? `s-${t.statusId}` : "s-none";
       ensure(k, t.statusName || "—", {
@@ -365,9 +363,7 @@ function GroupLeader({ group, mode, open, onToggle }) {
           }}
         />
       )}
-      {mode === "type" && (
-        <TypeIcon name={group.typeName} color={group.typeColor} size={12} />
-      )}
+      {mode === "type" && <TaskTypeIcon task={group} size={12} />}
 
       <span className="flex-1 min-w-0 text-[12px] font-semibold text-fg truncate">
         {group.label}
@@ -609,7 +605,7 @@ export function Timeline({ tasks = [], sprints = [], assignees = [], onTaskClick
                           style={{ height: ROW_TASK_H }}
                           title={t.title}
                         >
-                          <TypeIcon name={t.typeName} color={t.typeColor} size={11} />
+                          <TaskTypeIcon task={t} size={11} />
                           <span className="font-mono text-[10px] text-fg-faint shrink-0">
                             {t.key}
                           </span>
@@ -803,7 +799,7 @@ export function Timeline({ tasks = [], sprints = [], assignees = [], onTaskClick
                   onClick={() => onTaskClick?.(t.id)}
                   className="flex items-center gap-1.5 px-2 py-1 text-[12px] cursor-pointer rounded hover:bg-surface-elevated border border-transparent hover:border-border-soft text-left"
                 >
-                  <TypeIcon name={t.typeName} color={t.typeColor} size={11} />
+                  <TaskTypeIcon task={t} size={11} />
                   <span className="font-mono text-[10px] text-fg-faint shrink-0">{t.key}</span>
                   <span className="flex-1 truncate text-fg">{t.title}</span>
                 </button>

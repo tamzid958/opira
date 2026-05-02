@@ -3,9 +3,9 @@
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
-import { Icon, TypeIcon } from "@/components/icons";
+import { Icon } from "@/components/icons";
+import { TaskStatusPill, TaskTypeIcon } from "@/components/ui/task-meta";
 import { Menu } from "@/components/ui/menu";
-import { StatusPill } from "@/components/ui/status-pill";
 import { LoadingPill } from "@/components/ui/loading-pill";
 import { OUTGOING_RELATION_TYPES, RELATION_LABELS } from "@/lib/openproject/mappers";
 import {
@@ -201,7 +201,7 @@ export function RelationsPanel({
                   <VerbChip verb={r.verb} label={r.label} />
                 </span>
                 <span className="grid place-items-center text-fg-subtle shrink-0">
-                  <TypeIcon name={local?.typeName} color={local?.typeColor} size={12} />
+                  <TaskTypeIcon task={local} size={12} />
                 </span>
                 <button
                   type="button"
@@ -222,11 +222,7 @@ export function RelationsPanel({
                 </button>
                 {local && (
                   <span className="shrink-0">
-                    <StatusPill
-                      name={local.statusName}
-                      isClosed={!!local.statusIsClosed}
-                      color={local.statusColor}
-                    />
+                    <TaskStatusPill task={local} />
                   </span>
                 )}
                 {r.permissions?.delete ? (

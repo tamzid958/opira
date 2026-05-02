@@ -1,30 +1,8 @@
 import { fetchAllPages, opFetch, withQuery, buildFilters } from "@/lib/openproject/client";
 import { errorResponse } from "@/lib/openproject/route-utils";
-import {
-  buildCreateBody,
-  elementsOf,
-  mapPriority,
-  mapStatus,
-  mapType,
-  mapWorkPackage,
-} from "@/lib/openproject/mappers";
+import { buildCreateBody, mapWorkPackage } from "@/lib/openproject/mappers";
+import { loadLookups } from "@/lib/openproject/lookups";
 import { htmlToMarkdown } from "@/lib/openproject/description";
-
-async function loadLookups(projectId) {
-  const typesPath = projectId
-    ? `/projects/${encodeURIComponent(projectId)}/types`
-    : "/types";
-  const [statusesHal, typesHal, prioritiesHal] = await Promise.all([
-    opFetch("/statuses").catch(() => null),
-    opFetch(typesPath).catch(() => null),
-    opFetch("/priorities").catch(() => null),
-  ]);
-  return {
-    statuses: elementsOf(statusesHal).map(mapStatus),
-    types: elementsOf(typesHal).map(mapType),
-    priorities: elementsOf(prioritiesHal).map(mapPriority),
-  };
-}
 
 export const dynamic = "force-dynamic";
 
