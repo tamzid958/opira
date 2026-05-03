@@ -29,6 +29,11 @@ const CACHE = makeCache({ ttlMs: 5 * 60 * 1000 });
 // UI's best-effort tooltip already accounts for missing data.
 const WP_FETCH_CAP = 200;
 
+// Cap on extra "candidate ex-member" WPs we'll scan from other versions to
+// reconstruct items that left this sprint. We don't know they were ever in
+// our sprint until we read their journal — capping here bounds cost.
+const EX_MEMBER_SCAN_CAP = 200;
+
 async function computeBurndown(projectId, sprintId) {
   const v = await opFetch(`/versions/${sprintId}`);
   const sprint = mapVersionFull(v);
@@ -40,6 +45,7 @@ async function computeBurndown(projectId, sprintId) {
       committedAtStart: 0,
       addedAfterStart: { count: 0, points: 0 },
       removedAfterStart: { count: 0, points: 0 },
+      completed: { count: 0, points: 0 },
       scopeEvents: [],
       carryOver: {},
       truncated: false,
@@ -69,6 +75,9 @@ async function computeBurndown(projectId, sprintId) {
     .filter((s) => s.status === "closed" && String(s.id) !== String(sprintId))
     .map((s) => s.name)
     .filter(Boolean);
+  const otherVersionIds = allVersions
+    .filter((v) => String(v.id) !== String(sprintId))
+    .map((v) => v.id);
   const currentWps = currentEls.map((wp) => mapWorkPackage(wp, lookups));
 
   // Estimation mode: schema is the source of truth (the OP admin configured
@@ -110,10 +119,56 @@ async function computeBurndown(projectId, sprintId) {
     baselineSource = "fallback-empty";
   }
 
-  // Activities — drive day-level scope events + carry-over detection. Cap at
-  // WP_FETCH_CAP to bound cost; degrade gracefully past the cap.
-  const truncated = currentWps.length > WP_FETCH_CAP;
-  const scanWps = truncated ? currentWps.slice(0, WP_FETCH_CAP) : currentWps;
+  // Candidate ex-members: items currently sitting in OTHER versions of this
+  // project. Some of them may have been moved out of *this* sprint (e.g. the
+  // "move undone work to next sprint" flow at sprint close). We don't know
+  // which until we read their journals, so this is just the candidate pool —
+  // the activity scan below promotes the ones whose journal mentions our
+  // sprint into the full universe.
+  let otherWps = [];
+  if (sprint.name && otherVersionIds.length > 0) {
+    try {
+      const otherEls = await fetchAllPages(
+        `/projects/${encodeURIComponent(projectId)}/work_packages`,
+        {
+          filters: buildFilters([
+            { version: { operator: "=", values: otherVersionIds } },
+          ]),
+        },
+      );
+      otherWps = otherEls
+        .map((wp) => mapWorkPackage(wp, lookups))
+        .slice(0, EX_MEMBER_SCAN_CAP);
+    } catch {
+      otherWps = [];
+    }
+  }
+
+  // Build the initial "definitely in this sprint at some point" set: current
+  // members + baseline members. Activity scan may promote candidates from
+  // `otherWps` into this set later if their journals mention our sprint.
+  const universeMap = new Map();
+  for (const w of currentWps) universeMap.set(w.nativeId, w);
+  if (baselineWps) {
+    for (const w of baselineWps) {
+      if (!universeMap.has(w.nativeId)) universeMap.set(w.nativeId, w);
+    }
+  }
+
+  // Activities — drive day-level scope events + carry-over detection +
+  // ex-member discovery. Cap at WP_FETCH_CAP to bound cost; degrade gracefully
+  // past the cap.
+  const definite = [...universeMap.values()];
+  const candidatesById = new Map();
+  for (const w of otherWps) {
+    if (!universeMap.has(w.nativeId)) candidatesById.set(w.nativeId, w);
+  }
+  const candidateWps = [...candidatesById.values()];
+  const totalScanCandidates = definite.length + candidateWps.length;
+  const truncated = totalScanCandidates > WP_FETCH_CAP;
+  // Prefer scanning definite members first — candidates only get a slot if
+  // we have budget left under the cap.
+  const scanWps = [...definite, ...candidateWps].slice(0, WP_FETCH_CAP);
   const perWp = await Promise.all(
     scanWps.map((t) =>
       opFetch(`/work_packages/${t.nativeId}/activities`)
@@ -144,6 +199,8 @@ async function computeBurndown(projectId, sprintId) {
     const wpPoints = weightOf(r.wp, wOpts);
     const wpPointsRaw = r.wp.pointsRaw ?? null;
     const priorClosed = new Set();
+    const isCandidate = candidatesById.has(wpId);
+    let touchedOurSprint = !isCandidate;
 
     for (const a of r.acts) {
       const day = (a.createdAt || "").slice(0, 10);
@@ -157,6 +214,7 @@ async function computeBurndown(projectId, sprintId) {
         }
         if (sprint.name) {
           const kind = classifyVersionDetail(detail, sprint.name);
+          if (kind) touchedOurSprint = true;
           // Strict `>` so events on sprint-start day fall inside the
           // baseline (which is now sprint-start EOD) instead of double-
           // counting as mid-sprint additions.
@@ -181,6 +239,13 @@ async function computeBurndown(projectId, sprintId) {
       }
     }
 
+    // A candidate from `otherWps` only joins the universe if its journal
+    // actually mentions this sprint by name. Items that just happen to live
+    // in another sprint don't pollute the report.
+    if (isCandidate && touchedOurSprint) {
+      universeMap.set(wpId, r.wp);
+    }
+
     if (priorClosed.size > 0) {
       carryOver[wpId] = {
         count: priorClosed.size,
@@ -190,84 +255,105 @@ async function computeBurndown(projectId, sprintId) {
   }
 
   // ── Scope summary ─────────────────────────────────────────────────────
-  // Prefer the timestamps baseline; fall back to journal-derived added set
-  // when OP didn't return a baseline snapshot.
+  // Universe = every WP that was in this sprint at some point (current
+  // members ∪ baseline ∪ journal-confirmed ex-members). Computing scope
+  // numbers off the universe rather than `currentWps` is what stops the
+  // sprint report from collapsing to 100% the moment undone work is moved
+  // out of a closing sprint.
+  const universe = [...universeMap.values()];
+  const universeIds = new Set(universe.map((w) => w.nativeId));
+  const currentIds = new Set(currentWps.map((w) => w.nativeId));
+
+  // Journal-derived join/leave days. `joinedBy` is the EARLIEST add event
+  // (when did this WP first arrive in our sprint?), `leftBy` is the LATEST
+  // remove event (when did it last leave?) — this pair gives us a coarse
+  // membership window even for items we no longer hold.
+  const joinedBy = new Map();
+  const leftBy = new Map();
+  for (const ev of scopeEvents) {
+    if (ev.kind === "added") {
+      const cur = joinedBy.get(ev.wpId);
+      if (!cur || ev.day < cur) joinedBy.set(ev.wpId, ev.day);
+    } else if (ev.kind === "removed") {
+      const cur = leftBy.get(ev.wpId);
+      if (!cur || ev.day > cur) leftBy.set(ev.wpId, ev.day);
+    }
+  }
+  // If the WP is currently in our sprint, any earlier "removed" event was
+  // followed by a re-add — clear leftBy so the membership window stays open.
+  for (const id of currentIds) leftBy.delete(id);
+
   let committedAtStart;
   let addedSet;
   let removedSet;
   if (baselineWps) {
     const baselineIds = new Set(baselineWps.map((w) => w.nativeId));
-    const currentIds = new Set(currentWps.map((w) => w.nativeId));
-    addedSet = new Set([...currentIds].filter((id) => !baselineIds.has(id)));
-    removedSet = new Set([...baselineIds].filter((id) => !currentIds.has(id)));
+    addedSet = new Set([...universeIds].filter((id) => !baselineIds.has(id)));
+    removedSet = new Set(
+      [...baselineIds].filter((id) => !currentIds.has(id)),
+    );
     committedAtStart = baselineWps.reduce((s, w) => s + weightOf(w, wOpts), 0);
   } else {
-    addedSet = new Set(
-      scopeEvents.filter((e) => e.kind === "added").map((e) => e.wpId),
-    );
+    // No timestamps baseline. Reconstruct from the journal: a universe item
+    // with no "added" event was already in the sprint at sprint-start.
+    addedSet = new Set([...universeIds].filter((id) => joinedBy.has(id)));
     removedSet = new Set(
-      scopeEvents
-        .filter((e) => e.kind === "removed")
-        .map((e) => e.wpId)
-        .filter((id) => !currentWps.some((w) => w.nativeId === id)),
+      [...universeIds].filter((id) => leftBy.has(id) && !currentIds.has(id)),
     );
-    committedAtStart = currentWps.reduce(
+    committedAtStart = universe.reduce(
       (s, w) => (addedSet.has(w.nativeId) ? s : s + weightOf(w, wOpts)),
       0,
     );
   }
-  const addedPoints = currentWps
+  const addedPoints = universe
     .filter((w) => addedSet.has(w.nativeId))
     .reduce((s, w) => s + weightOf(w, wOpts), 0);
-  const removedPoints = (baselineWps || [])
+  const removedPoints = universe
     .filter((w) => removedSet.has(w.nativeId))
     .reduce((s, w) => s + weightOf(w, wOpts), 0);
 
-  // Itemized scope-events list. Cross-reference baseline so we surface
-  // removed-and-not-readded WPs even when journal parsing missed them.
-  const scopeEventIndex = new Map();
-  for (const ev of scopeEvents) {
-    scopeEventIndex.set(`${ev.wpId}:${ev.kind}:${ev.day}`, ev);
-  }
+  // Itemized scope-events list. Cross-reference baseline + universe so we
+  // surface added/removed items even when journal parsing missed the day.
   const itemized = [...scopeEvents];
-  if (baselineWps) {
-    for (const w of currentWps) {
-      if (!addedSet.has(w.nativeId)) continue;
-      // No journal event captured this addition — synthesize a placeholder
-      // so the UI table still lists the WP. Day is unknown.
-      const hasDay = scopeEvents.some(
-        (e) => e.wpId === w.nativeId && e.kind === "added",
-      );
-      if (!hasDay) {
-        itemized.push({
-          wpId: w.nativeId,
-          wpKey: w.key,
-          wpTitle: w.title,
-          points: weightOf(w, wOpts),
-          pointsRaw: w.pointsRaw ?? null,
-          day: null,
-          kind: "added",
-          by: null,
-        });
-      }
+  const universeById = new Map(universe.map((w) => [w.nativeId, w]));
+  for (const id of addedSet) {
+    const w = universeById.get(id);
+    if (!w) continue;
+    const hasDay = scopeEvents.some(
+      (e) => e.wpId === id && e.kind === "added",
+    );
+    if (!hasDay) {
+      itemized.push({
+        wpId: id,
+        wpKey: w.key,
+        wpTitle: w.title,
+        points: weightOf(w, wOpts),
+        pointsRaw: w.pointsRaw ?? null,
+        day: null,
+        kind: "added",
+        by: null,
+      });
     }
-    for (const w of baselineWps) {
-      if (!removedSet.has(w.nativeId)) continue;
-      const hasDay = scopeEvents.some(
-        (e) => e.wpId === w.nativeId && e.kind === "removed",
-      );
-      if (!hasDay) {
-        itemized.push({
-          wpId: w.nativeId,
-          wpKey: w.key,
-          wpTitle: w.title,
-          points: weightOf(w, wOpts),
-          pointsRaw: w.pointsRaw ?? null,
-          day: null,
-          kind: "removed",
-          by: null,
-        });
-      }
+  }
+  for (const id of removedSet) {
+    const w =
+      universeById.get(id) ||
+      (baselineWps || []).find((b) => b.nativeId === id);
+    if (!w) continue;
+    const hasDay = scopeEvents.some(
+      (e) => e.wpId === id && e.kind === "removed",
+    );
+    if (!hasDay) {
+      itemized.push({
+        wpId: id,
+        wpKey: w.key,
+        wpTitle: w.title,
+        points: weightOf(w, wOpts),
+        pointsRaw: w.pointsRaw ?? null,
+        day: null,
+        kind: "removed",
+        by: null,
+      });
     }
   }
 
@@ -305,43 +391,56 @@ async function computeBurndown(projectId, sprintId) {
     // toClosed === null → couldn't parse the destination; leave doneBy alone
     // and let the post-walk reconciliation against `statusIsClosed` correct it.
   }
-  // Currently-done WPs that have no journal "done" event (closed before the
-  // journal retention window, or activities fetch was capped). Anchor them
-  // at sprint.start so they're excluded from every day's remaining.
+  // Reconciliation against current status only applies to WPs we still hold
+  // — for ex-members, the journal is the only source of truth (their
+  // "current" status reflects their state in the *next* sprint, not when
+  // they left ours).
   for (const t of currentWps) {
     if (t.statusIsClosed && !doneBy.has(t.nativeId)) {
       doneBy.set(t.nativeId, sprint.start);
     }
-  }
-  // Currently-NOT-done WPs that the journal *did* flag as done (then they
-  // got reopened off-journal, or our regex caught a false positive) —
-  // ensure remaining counts them. Without this, a stray "done" mention in
-  // a comment could permanently remove the WP from the burndown.
-  for (const t of currentWps) {
     if (!t.statusIsClosed && doneBy.has(t.nativeId)) {
       doneBy.delete(t.nativeId);
     }
   }
 
-  // Day a WP joined this sprint, when it was added mid-sprint.
-  const joinedBy = new Map();
-  for (const ev of scopeEvents) {
-    if (ev.kind !== "added") continue;
-    const cur = joinedBy.get(ev.wpId);
-    if (!cur || ev.day < cur) joinedBy.set(ev.wpId, ev.day);
-  }
-
   const points = days.map(({ day, isWorkingDay }) => {
     let remaining = 0;
-    for (const t of currentWps) {
+    for (const t of universe) {
       const joined = joinedBy.get(t.nativeId) || sprint.start;
       if (joined > day) continue;
+      // Item left the sprint on/before `day` and didn't come back — it's
+      // no longer part of this sprint's scope from that day forward.
+      const left = leftBy.get(t.nativeId);
+      if (left && left <= day) continue;
       const done = doneBy.get(t.nativeId);
       if (done && done <= day) continue;
       remaining += weightOf(t, wOpts);
     }
     return { day, remaining, isWorkingDay };
   });
+
+  // Completed-during-sprint: items still in this sprint and currently closed,
+  // PLUS ex-members that closed before they left. Items that left while open
+  // (the typical "carry undone work to next sprint" flow) do NOT count — they
+  // weren't completed in this sprint.
+  let completed = { count: 0, points: 0 };
+  for (const w of universe) {
+    const wpId = w.nativeId;
+    if (currentIds.has(wpId)) {
+      if (w.statusIsClosed) {
+        completed.count += 1;
+        completed.points += weightOf(w, wOpts);
+      }
+    } else {
+      const closedAt = doneBy.get(wpId);
+      const leftAt = leftBy.get(wpId);
+      if (closedAt && leftAt && closedAt <= leftAt) {
+        completed.count += 1;
+        completed.points += weightOf(w, wOpts);
+      }
+    }
+  }
 
   const totalCommitted = currentWps.reduce((s, t) => s + weightOf(t, wOpts), 0);
 
@@ -352,6 +451,7 @@ async function computeBurndown(projectId, sprintId) {
     committedAtStart,
     addedAfterStart: { count: addedSet.size, points: addedPoints },
     removedAfterStart: { count: removedSet.size, points: removedPoints },
+    completed,
     scopeEvents: itemized.sort(
       (a, b) => (a.day || "").localeCompare(b.day || ""),
     ),

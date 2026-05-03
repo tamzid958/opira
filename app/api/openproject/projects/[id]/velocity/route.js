@@ -57,26 +57,25 @@ async function computeVelocity(projectId) {
   // filter, which we tag per-sprint so the UI can flag approximate data.
   const out = await Promise.all(
     closed.map(async (v) => {
-      const filters = buildFilters([{ version: { operator: "=", values: [v.id] } }]);
+      const versionFilters = buildFilters([
+        { version: { operator: "=", values: [v.id] } },
+      ]);
       const ts = `${v.end}T23:59:59Z`;
-      // Live WPs drive `completed` — `statusIsClosed` reflects the current
-      // status, so work that was finished AFTER the sprint was closed still
-      // counts (matches how teams actually use OP: close the sprint first,
-      // then mark stragglers done).
       const liveEls = await fetchAllPages(
         `/projects/${encodeURIComponent(projectId)}/work_packages`,
-        { filters },
+        { filters: versionFilters },
       );
-      // Snapshot WPs drive `committed` — using the sprint-end snapshot so a
-      // post-close points resize ("we bumped M to L last week") doesn't
-      // retroactively rewrite historical velocity. Falls back to live if
-      // the OP install doesn't expose the `timestamps` filter.
+      // Snapshot at sprint-end determines BOTH who was in the sprint and
+      // the historical weights — so a post-close points resize doesn't
+      // rewrite velocity, and items that were moved to a follow-up sprint
+      // (the "carry undone work" flow) still count toward this sprint's
+      // commit/complete because they were members at sprint-end.
       let snapshotEls = liveEls;
       let timeTraveled = false;
       try {
         snapshotEls = await fetchAllPages(
           `/projects/${encodeURIComponent(projectId)}/work_packages`,
-          { filters, timestamps: ts },
+          { filters: versionFilters, timestamps: ts },
         );
         timeTraveled = true;
       } catch {
@@ -88,12 +87,23 @@ async function computeVelocity(projectId) {
       // point-mode project's historical velocity isn't computed as
       // working-day counts on sprints that happen to have unsized WPs.
       const sprintMode =
-        schemaMode || inferModeFromTasks(liveWps) || "numeric";
+        schemaMode || inferModeFromTasks(snapshotWps) || "numeric";
       const opts = { mode: sprintMode };
       const committed = snapshotWps.reduce((s, t) => s + weightOf(t, opts), 0);
-      const completed = liveWps
-        .filter((t) => t.statusIsClosed)
-        .reduce((s, t) => s + weightOf(t, opts), 0);
+
+      // For items still in this sprint, use the live (current) status —
+      // that preserves the "stragglers closed after sprint-end still count"
+      // behavior the team relied on. For items that have since been moved
+      // out of this sprint (the "carry undone work to next sprint" flow),
+      // use the snapshot's sprint-end status, since their *current* status
+      // belongs to whatever sprint they ended up in. This avoids issuing a
+      // by-id refetch — some OP installs reject the id filter.
+      const liveById = new Map(liveWps.map((w) => [w.nativeId, w]));
+      const completed = snapshotWps.reduce((s, w) => {
+        const live = liveById.get(w.nativeId);
+        const isClosed = live ? live.statusIsClosed : w.statusIsClosed;
+        return isClosed ? s + weightOf(w, opts) : s;
+      }, 0);
       return {
         sprintId: v.id,
         sprintName: v.name,

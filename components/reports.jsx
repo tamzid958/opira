@@ -10,7 +10,7 @@ import { TaskTypeIcon } from "@/components/ui/task-meta";
 import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { useBurndown, useVelocity } from "@/lib/hooks/use-openproject-detail";
 import { workingDaySet } from "@/lib/openproject/working-days";
-import { formatEstimate, weightOf } from "@/lib/openproject/estimate";
+import { formatEstimate, sourceOf, weightOf } from "@/lib/openproject/estimate";
 import { safeParseISO } from "@/lib/utils";
 import { usePublicConfig } from "@/components/config-provider";
 
@@ -542,9 +542,17 @@ function Burndown({ projectId, sprint }) {
 
 function SprintReport({ projectId, sprint, sprintTasks, mode = "numeric" }) {
   const q = useBurndown(projectId, sprint?.id, !!projectId && !!sprint?.id);
-  const completedPts = sprintTasks
+  // Prefer the burndown route's `completed` figure: it counts items that
+  // closed *while in this sprint*, including ones that have since been moved
+  // to a follow-up sprint. Falling back to a current-membership scan would
+  // collapse to 100% the moment undone work is rolled to the next sprint.
+  const fallbackCompletedPts = sprintTasks
     .filter((t) => t.statusIsClosed)
     .reduce((s, t) => s + weightOf(t, { mode }), 0);
+  const completedPts =
+    q.data?.completed?.points != null
+      ? q.data.completed.points
+      : fallbackCompletedPts;
 
   if (q.isLoading) {
     return (
@@ -561,16 +569,13 @@ function SprintReport({ projectId, sprint, sprintTasks, mode = "numeric" }) {
   }
 
   const data = q.data || {};
-  // Match the Burndown panel's fallback: when the time-travel baseline
-  // returned empty (no WPs at sprint-start EOD) `committedAtStart` is 0
-  // even though the team really did commit to the current scope. Falling
-  // back to `totalCommitted` keeps the two panels' "Committed at start"
-  // numbers in sync. The `approx` flag below tells the user when this
-  // fallback is in play.
-  const baselineApprox = data.baselineSource && data.baselineSource !== "timestamps";
-  const committedAtStart = baselineApprox
-    ? data.totalCommitted || 0
-    : data.committedAtStart || 0;
+  // The burndown route reconstructs `committedAtStart` from the journal when
+  // the timestamps baseline isn't available, so we trust it directly. The
+  // `approx` flag is still surfaced via the BestEffort tooltip so users know
+  // the number is journal-derived rather than from a true OP snapshot.
+  const baselineApprox =
+    data.baselineSource && data.baselineSource !== "timestamps";
+  const committedAtStart = data.committedAtStart || 0;
   const added = data.addedAfterStart || { count: 0, points: 0 };
   const removed = data.removedAfterStart || { count: 0, points: 0 };
   const events = data.scopeEvents || [];
@@ -589,8 +594,9 @@ function SprintReport({ projectId, sprint, sprintTasks, mode = "numeric" }) {
             may not appear.
             {baselineApprox && (
               <>
-                {" "}OP reported zero work packages at sprint-start; the
-                committed-at-start number falls back to current scope.
+                {" "}OP didn&apos;t return a sprint-start snapshot; the
+                committed-at-start and completed numbers are reconstructed
+                from the activity history.
               </>
             )}
           </BestEffort>
@@ -1328,17 +1334,50 @@ function TypeBreakdown({ tasks }) {
 // ─────────────────────────────────────────────────────────────────
 // Top-level KPI row — five tiles the PM scans before anything else.
 
-function KpiRow({ sprint, sprintTasks, allTasks, velocity, unit = "pts", mode = "numeric" }) {
+function KpiRow({ projectId, sprint, sprintTasks, allTasks, velocity, unit = "pts", mode = "numeric" }) {
+  // Same query key as the Burndown / SprintReport panels — TanStack Query
+  // dedupes, so this doesn't add a second network round-trip.
+  const burndownQ = useBurndown(projectId, sprint?.id, !!projectId && !!sprint?.id);
   const sprintProgress = (() => {
     const wOpts = { mode };
+    // Prefer the burndown route's "ever in this sprint" universe over
+    // current membership: for closed sprints whose undone work has been
+    // moved to a follow-up sprint, `sprintTasks` only sees the leftover
+    // (typically all-closed) members and the percentage collapses to 100%.
+    const data = burndownQ.data;
+    if (data && (data.committedAtStart > 0 || data.totalCommitted > 0)) {
+      const denom = data.committedAtStart || data.totalCommitted || 0;
+      const donePts = data.completed?.points ?? 0;
+      // "sized" against the live current scope still — we don't have
+      // ex-member sizing without an extra fetch, and the data-entry gap
+      // is most actionable for the active sprint anyway.
+      const sized = sprintTasks.reduce(
+        (n, t) => (sourceOf(t, wOpts) ? n + 1 : n),
+        0,
+      );
+      return {
+        pct: denom > 0 ? Math.round((donePts / denom) * 100) : 0,
+        donePts,
+        totalPts: denom,
+        sized,
+        total: sprintTasks.length,
+      };
+    }
+    // Fallback while burndown is loading or unavailable.
     const totalPts = sprintTasks.reduce((s, t) => s + weightOf(t, wOpts), 0);
     const donePts = sprintTasks
       .filter((t) => t.statusIsClosed)
       .reduce((s, t) => s + weightOf(t, wOpts), 0);
+    const sized = sprintTasks.reduce(
+      (n, t) => (sourceOf(t, wOpts) ? n + 1 : n),
+      0,
+    );
     return {
       pct: totalPts > 0 ? Math.round((donePts / totalPts) * 100) : 0,
       donePts,
       totalPts,
+      sized,
+      total: sprintTasks.length,
     };
   })();
 
@@ -1393,7 +1432,11 @@ function KpiRow({ sprint, sprintTasks, allTasks, velocity, unit = "pts", mode = 
       <KpiTile
         label="Sprint progress"
         value={`${sprintProgress.pct}%`}
-        sub={`${sprintProgress.donePts} / ${sprintProgress.totalPts} ${unit}`}
+        sub={
+          sprintProgress.total > 0 && sprintProgress.sized < sprintProgress.total
+            ? `${sprintProgress.donePts} / ${sprintProgress.totalPts} ${unit} · ${sprintProgress.sized} / ${sprintProgress.total} sized`
+            : `${sprintProgress.donePts} / ${sprintProgress.totalPts} ${unit}`
+        }
       />
       <KpiTile
         label="Velocity (avg)"
@@ -1450,6 +1493,7 @@ export function Reports({ sprint, projectId, tasks = [] }) {
     <div className="px-1 sm:px-3 lg:px-6 py-3 sm:py-4">
       <div className="grid gap-4 max-w-300 mx-auto">
         <KpiRow
+          projectId={projectId}
           sprint={sprint}
           sprintTasks={sprintTasks}
           allTasks={tasks}
