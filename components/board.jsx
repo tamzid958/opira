@@ -523,9 +523,8 @@ export function Board({
   }, [columns, filtered]);
 
   // Per-task overlay flags: aging-since-update for open WPs, missing-estimate
-  // hint, and "updated since X" for the standup overlay. Computed once per
-  // (filtered, updatedSince) so the cards don't recompute on every render.
-  const overlayFlags = useMemo(() => {
+  // hint, and "updated since X" for the standup overlay.
+  const overlayFlags = (() => {
     const now = new Date();
     const sinceMs = updatedSince ? new Date(updatedSince).getTime() : null;
     const map = new Map();
@@ -545,31 +544,28 @@ export function Board({
       map.set(t.id, { agingDays: aging, estimateMissing, recentlyUpdated });
     }
     return map;
-  }, [filtered, updatedSince]);
+  })();
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
   // Click handler — modifier-key gates whether we toggle selection or
   // open the detail modal. Plain click always opens, so muscle memory
   // for "click a card to look at it" stays intact even with selection.
-  const handleCardClick = useCallback(
-    (task, e) => {
-      if (e.shiftKey || e.metaKey || e.ctrlKey) {
-        e.preventDefault();
-        toggleSelected(task.id);
-        return;
-      }
-      onTaskClick?.(task.id);
-    },
-    [onTaskClick, toggleSelected],
-  );
+  const handleCardClick = (task, e) => {
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      toggleSelected(task.id);
+      return;
+    }
+    onTaskClick?.(task.id);
+  };
 
-  const handleCardContextMenu = useCallback((task, e) => {
+  const handleCardContextMenu = (task, e) => {
     e.preventDefault();
     setCardMenu({ task, point: { x: e.clientX, y: e.clientY } });
-  }, []);
+  };
 
-  const closeCardMenu = useCallback(() => setCardMenu(null), []);
+  const closeCardMenu = () => setCardMenu(null);
 
   // ── Keyboard navigation ────────────────────────────────────────────────
   // Resolve the (column, row) of the currently-focused card. Falls back to
@@ -766,24 +762,21 @@ export function Board({
   // Bulk action helpers — fan the supplied callback across every selected
   // id. The parent's mutation hooks handle optimistic updates per id, so
   // the cards re-render in lockstep.
-  const runBulk = useCallback(
-    async (patch, label) => {
-      if (visibleSelected.size === 0 || !onBulkUpdate) return;
-      const ids = [...visibleSelected];
-      try {
-        await onBulkUpdate(ids, patch);
-        toast.success(
-          label
-            ? `${ids.length} issue${ids.length === 1 ? "" : "s"} → ${label}`
-            : `${ids.length} issue${ids.length === 1 ? "" : "s"} updated`,
-        );
-        clearSelection();
-      } catch (err) {
-        toast.error(err?.message || "Couldn't update some issues");
-      }
-    },
-    [visibleSelected, onBulkUpdate, clearSelection],
-  );
+  const runBulk = async (patch, label) => {
+    if (visibleSelected.size === 0 || !onBulkUpdate) return;
+    const ids = [...visibleSelected];
+    try {
+      await onBulkUpdate(ids, patch);
+      toast.success(
+        label
+          ? `${ids.length} issue${ids.length === 1 ? "" : "s"} → ${label}`
+          : `${ids.length} issue${ids.length === 1 ? "" : "s"} updated`,
+      );
+      clearSelection();
+    } catch (err) {
+      toast.error(err?.message || "Couldn't update some issues");
+    }
+  };
 
   if (columns.length === 0) {
     return (

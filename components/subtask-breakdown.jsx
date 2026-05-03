@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import { useImperativeHandle, useState } from "react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
 import { Avatar } from "@/components/ui/avatar";
@@ -288,20 +288,18 @@ function SubtaskRow({
 
 const PAGE_SIZE = 10;
 
-export const SubtaskBreakdown = forwardRef(function SubtaskBreakdown(
-  {
-    parent,
-    projectId,
-    statuses = [],
-    assignees = [],
-    sprints = [],
-    canCreate = true,
-    onChange,
-    onTaskClick,
-    allTasks = [],
-  },
+export function SubtaskBreakdown({
+  parent,
+  projectId,
+  statuses = [],
+  assignees = [],
+  sprints = [],
+  canCreate = true,
+  onChange,
+  onTaskClick,
+  allTasks = [],
   ref,
-) {
+}) {
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [page, setPage] = useState(1);
@@ -311,7 +309,7 @@ export const SubtaskBreakdown = forwardRef(function SubtaskBreakdown(
     startAdd: () => setAdding(true),
   }));
 
-  const childIndex = useMemo(() => buildChildIndex(allTasks), [allTasks]);
+  const childIndex = buildChildIndex(allTasks);
   const directChildren = childIndex.get(String(parent.nativeId)) || [];
 
   const totalPages = Math.max(1, Math.ceil(directChildren.length / PAGE_SIZE));
@@ -320,7 +318,7 @@ export const SubtaskBreakdown = forwardRef(function SubtaskBreakdown(
   const pageChildren = directChildren.slice(pageStart, pageStart + PAGE_SIZE);
   const showPager = directChildren.length > PAGE_SIZE;
 
-  const subtree = useMemo(() => {
+  const subtree = (() => {
     const out = [];
     const walk = (id) => {
       const list = childIndex.get(String(id)) || [];
@@ -331,7 +329,7 @@ export const SubtaskBreakdown = forwardRef(function SubtaskBreakdown(
     };
     walk(parent.nativeId);
     return out;
-  }, [childIndex, parent.nativeId]);
+  })();
 
   const totalCount = subtree.length;
   const doneCount = subtree.filter((t) => t.statusIsClosed).length;
@@ -468,4 +466,4 @@ export const SubtaskBreakdown = forwardRef(function SubtaskBreakdown(
       )}
     </section>
   );
-});
+}

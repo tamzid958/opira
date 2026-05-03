@@ -60,7 +60,7 @@ export function CenterNotConfigured() {
         Configure these env vars in <code className="px-1 py-0.5 rounded bg-surface-muted text-fg text-[12px] font-mono">.env.local</code> and restart the dev server:
       </p>
       <pre className="bg-surface-subtle border border-border-soft rounded-md px-3 py-3 text-[12.5px] font-mono text-fg overflow-auto m-0">
-        {`NEXT_PUBLIC_OPENPROJECT_URL=https://your-instance
+        {`OPENPROJECT_URL=https://your-instance
 OPENPROJECT_OAUTH_CLIENT_ID=...
 OPENPROJECT_OAUTH_CLIENT_SECRET=...
 AUTH_SECRET=...`}

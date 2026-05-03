@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { signOut } from "next-auth/react";
@@ -12,6 +13,7 @@ import { useMe } from "@/lib/hooks/use-openproject-detail";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
 import { ThemePicker } from "@/components/theme-switch";
 import { WorkingHoursCard } from "@/components/working-hours-card";
+import { usePublicConfig } from "@/components/config-provider";
 
 // All editable account fields (name, email, avatar, language, timezone,
 // password) are managed in OpenProject — the v3 API exposes user records
@@ -25,6 +27,90 @@ const FIELD_LABEL =
   "w-32 shrink-0 text-[12px] font-medium text-fg-muted uppercase tracking-wider";
 const FIELD_VALUE = "flex-1 text-[13.5px] text-fg leading-relaxed min-w-0 break-words";
 
+// Cache slices grouped by user-facing domain. Every TanStack Query in this
+// app lives under ["op", <subkey>, ...], so invalidating by the second
+// element scopes the refresh without touching unrelated data. `null` means
+// "everything".
+const REFRESH_TARGETS = [
+  {
+    id: "all",
+    label: "Everything",
+    description: "Mark all cached data stale and refetch what's currently on screen.",
+    subkeys: null,
+  },
+  {
+    id: "work",
+    label: "Work packages & sprints",
+    description: "Tasks, sprints, burndown, velocity, capacity, scope changes, carryover.",
+    subkeys: [
+      "tasks",
+      "wp",
+      "sprints",
+      "burndown",
+      "velocity",
+      "capacity",
+      "scope-changes",
+      "carryover",
+      "open-counts",
+      "queries",
+      "search",
+    ],
+  },
+  {
+    id: "projects",
+    label: "Projects & portfolios",
+    description: "Project list, portfolios, programs, categories, versions metadata.",
+    subkeys: ["projects", "project", "portfolios", "portfolio", "programs", "program", "categories"],
+  },
+  {
+    id: "people",
+    label: "People & permissions",
+    description: "Members, assignees, roles, working hours, time off, your profile.",
+    subkeys: [
+      "users",
+      "user",
+      "me",
+      "members",
+      "available-assignees",
+      "roles",
+      "working-hours",
+      "non-working-times",
+      "viewer-permissions",
+    ],
+  },
+  {
+    id: "notifications",
+    label: "Notifications & reminders",
+    description: "Inbox, reminders, time entries.",
+    subkeys: ["notifications", "reminders", "time-entries", "time-entry-activities"],
+  },
+  {
+    id: "metadata",
+    label: "Types, statuses & schemas",
+    description: "Work-package types, statuses, priorities, custom options, schemas, documents.",
+    subkeys: [
+      "types",
+      "status",
+      "statuses",
+      "priorities",
+      "custom-options",
+      "schema",
+      "documents",
+      "document",
+      "wiki-page",
+    ],
+  },
+];
+
+const REFRESH_TIMEOUT_MS = 30_000;
+const JUST_DONE_PULSE_MS = 4000;
+
+const TIME_FMT = new Intl.DateTimeFormat(undefined, {
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
 export default function AccountPage() {
   const me = useMe();
   // Pull the richer OP user record (login, language, timezone, avatar URL,
@@ -37,12 +123,39 @@ export default function AccountPage() {
     retry: false,
   });
   const qc = useQueryClient();
+  const [refreshingId, setRefreshingId] = useState(null);
+  // Last completed refresh — formatted at completion time so render stays pure.
+  const [lastRefresh, setLastRefresh] = useState(null);
+  // Auto-clears via setTimeout, so "Refreshed" pill doesn't depend on Date.now().
+  const [justDoneId, setJustDoneId] = useState(null);
+
+  const handleRefresh = async (target) => {
+    if (refreshingId) return;
+    setRefreshingId(target.id);
+    // Hard-cap the spinner so a stuck request can't lock the UI forever.
+    const deadline = new Promise((resolve) => setTimeout(resolve, REFRESH_TIMEOUT_MS));
+    try {
+      const work = target.subkeys === null
+        ? qc.invalidateQueries({ queryKey: ["op"] })
+        : Promise.all(
+            target.subkeys.map((k) => qc.invalidateQueries({ queryKey: ["op", k] })),
+          );
+      await Promise.race([work, deadline]);
+      setLastRefresh({ id: target.id, label: target.label, at: TIME_FMT.format(new Date()) });
+      setJustDoneId(target.id);
+      setTimeout(() => {
+        setJustDoneId((current) => (current === target.id ? null : current));
+      }, JUST_DONE_PULSE_MS);
+    } finally {
+      setRefreshingId(null);
+    }
+  };
 
   const sessionUser = me.data?.user || null;
   const opUser = opMe.data || null;
 
-  const opUrl = process.env.NEXT_PUBLIC_OPENPROJECT_URL || "";
-  const opAccountHref = opUrl ? `${opUrl}/my/account` : null;
+  const { openprojectUrl } = usePublicConfig();
+  const opAccountHref = openprojectUrl ? `${openprojectUrl}/my/account` : null;
 
   const handleSignOut = async () => {
     qc.clear();
@@ -180,6 +293,71 @@ export default function AccountPage() {
           <WorkingHoursCard userId={sessionUser?.id || opMe.data?.id || null} />
         </section>
 
+        {/* ── Data refresh ────────────────────────────────────────── */}
+        <section className="bg-surface-elevated border border-border rounded-2xl p-6 mb-6">
+          <h2 className="font-display text-[15px] font-bold text-fg m-0 mb-1.5">
+            Refresh data
+          </h2>
+          <p className="text-[13px] text-fg-muted leading-relaxed m-0 mb-4">
+            Opira caches OpenProject responses so screens stay snappy. If something
+            looks out of date, force a hard refresh — cached entries are marked stale
+            and anything visible refetches immediately.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {REFRESH_TARGETS.map((target) => {
+              const isBusy = refreshingId === target.id;
+              const isPrimary = target.id === "all";
+              const justDone = !isBusy && justDoneId === target.id;
+              const base =
+                "group inline-flex items-start gap-2.5 text-left rounded-lg border px-3 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+              const skin = isPrimary
+                ? "bg-accent-50 border-accent-200 text-fg hover:bg-accent-100 hover:border-accent sm:col-span-2"
+                : "bg-surface-subtle border-border text-fg hover:bg-surface-elevated hover:border-border-strong";
+              return (
+                <button
+                  key={target.id}
+                  type="button"
+                  onClick={() => handleRefresh(target)}
+                  disabled={Boolean(refreshingId) && !isBusy}
+                  aria-busy={isBusy}
+                  className={`${base} ${skin}`}
+                >
+                  <Icon
+                    name="refresh"
+                    size={14}
+                    className={`mt-0.5 shrink-0 ${isBusy ? "animate-spin" : ""}`}
+                    aria-hidden="true"
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold leading-snug">
+                      {target.label}
+                      {justDone && (
+                        <span className="text-[11px] font-medium text-status-done-fg">
+                          Refreshed
+                        </span>
+                      )}
+                      {isBusy && (
+                        <span className="text-[11px] font-medium text-fg-muted">
+                          Refreshing…
+                        </span>
+                      )}
+                    </span>
+                    <span className="block text-[12px] text-fg-muted leading-snug mt-0.5">
+                      {target.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {lastRefresh && (
+            <p className="text-[12px] text-fg-muted mt-3 mb-0">
+              Last refresh — <strong className="text-fg font-semibold">{lastRefresh.label}</strong>{" "}
+              at {lastRefresh.at}.
+            </p>
+          )}
+        </section>
+
         {/* ── Settings notice ─────────────────────────────────────── */}
         <section className="bg-surface-elevated border border-border rounded-2xl p-6">
           <h2 className="font-display text-[15px] font-bold text-fg m-0 mb-1.5">
@@ -203,7 +381,7 @@ export default function AccountPage() {
           ) : (
             <div className="rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-3 text-[13px] text-fg-muted">
               <strong className="text-fg font-semibold">Not yet configured.</strong>{" "}
-              Set <code className="font-mono text-[12px] px-1 py-px rounded bg-surface-elevated border border-border">NEXT_PUBLIC_OPENPROJECT_URL</code>{" "}
+              Set <code className="font-mono text-[12px] px-1 py-px rounded bg-surface-elevated border border-border">OPENPROJECT_URL</code>{" "}
               in your environment to enable the deep link to OpenProject&apos;s account settings.
             </div>
           )}

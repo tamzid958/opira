@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import authConfig from "./auth.config";
 
-const OP_BASE = (process.env.NEXT_PUBLIC_OPENPROJECT_URL || "").replace(/\/$/, "");
+const OP_BASE = (process.env.OPENPROJECT_URL || "").replace(/\/$/, "");
 
 // Custom OAuth provider for OpenProject (RFC 6749 Authorization Code + PKCE).
 // OpenProject doesn't ship OIDC discovery, so we wire endpoints by hand.

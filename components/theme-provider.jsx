@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 // Theme system. The four modes map to `data-theme` values on `<html>`:
 //   - "system" (preference, not a value) → resolves to "light" or "dark"
@@ -72,7 +72,7 @@ export function ThemeProvider({ children }) {
     return () => mql.removeEventListener?.("change", onChange);
   }, [preference]);
 
-  const setPreference = useCallback((next) => {
+  const setPreference = (next) => {
     if (!THEME_PREFS.includes(next)) return;
     setPreferenceState(next);
     try {
@@ -83,7 +83,7 @@ export function ThemeProvider({ children }) {
     const r = resolveTheme(next);
     setResolved(r);
     applyTheme(r);
-  }, []);
+  };
 
   return (
     <ThemeContext.Provider value={{ preference, resolved, setPreference }}>

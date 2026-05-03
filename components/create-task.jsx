@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Avatar } from "@/components/ui/avatar";
@@ -13,6 +13,7 @@ import { TShirtPicker } from "@/components/tshirt-picker";
 import { PEOPLE } from "@/lib/data";
 import { useCustomOptions, useWpSchema } from "@/lib/hooks/use-openproject-detail";
 import { cn, findById } from "@/lib/utils";
+import { usePublicConfig } from "@/components/config-provider";
 
 const schema = z.object({
   type: z.string().min(1, "Pick a type"),
@@ -146,7 +147,6 @@ export function CreateTask({
     register,
     handleSubmit,
     control,
-    watch,
     setValue,
     reset,
     formState: { isSubmitting, errors },
@@ -169,9 +169,9 @@ export function CreateTask({
     },
   });
 
-  const type = watch("type");
-  const assignee = watch("assignee");
-  const priority = watch("priority");
+  const type = useWatch({ control, name: "type" });
+  const assignee = useWatch({ control, name: "assignee" });
+  const priority = useWatch({ control, name: "priority" });
 
   // Once priorities load, hydrate the form's priority with the project's
   // configured default — `priority.isDefault` is the API truth.
@@ -181,29 +181,27 @@ export function CreateTask({
     const def = priorities.find((p) => p.isDefault) || priorities[0];
     if (def) setValue("priority", String(def.id));
   }, [priorities, priority, setValue]);
-  const points = watch("points");
-  const pointsHref = watch("pointsHref");
-  const sprint = watch("sprint");
-  const epicId = watch("epic");
+  const points = useWatch({ control, name: "points" });
+  const pointsHref = useWatch({ control, name: "pointsHref" });
+  const sprint = useWatch({ control, name: "sprint" });
+  const epicId = useWatch({ control, name: "epic" });
 
   // Derive a story-points schema from any task whose type matches — its
   // schemaHref tells us whether SP is a CustomOption (t-shirt sizes) or
   // numeric, and exposes the option list either via allowedValues or via
   // sample-WP discovery on the schema route. Falls back to any task, then
   // null (renders the legacy numeric picker).
-  const schemaHref = useMemo(() => {
+  const schemaHref = (() => {
     const list = Array.isArray(tasks) ? tasks : [];
     return (
       list.find((t) => String(t.typeId) === String(type))?.schemaHref ||
       list[0]?.schemaHref ||
       null
     );
-  }, [tasks, type]);
+  })();
   const schemaQ = useWpSchema(schemaHref);
-  const spField =
-    schemaQ.data?.fields?.[
-      process.env.NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD || "storyPoints"
-    ];
+  const { storyPointsField } = usePublicConfig();
+  const spField = schemaQ.data?.fields?.[storyPointsField];
   const spIsCustomOption = spField?.type === "CustomOption";
   const spOptionsQ = useCustomOptions(
     spField?.allowedValuesHref,
@@ -249,7 +247,10 @@ export function CreateTask({
 
   const selectedEpic = epicId ? findById(epics, epicId) : null;
 
-  const selectedTag = (watch("labels") || [])[0] || null;
+  const labels = useWatch({ control, name: "labels" });
+  const selectedTag = (labels || [])[0] || null;
+  const startDate = useWatch({ control, name: "startDate" });
+  const dueDate = useWatch({ control, name: "dueDate" });
 
   const pointsLabel = spIsCustomOption
     ? (spOptions || []).find(
@@ -454,7 +455,7 @@ export function CreateTask({
                   <div className="flex items-center gap-1.5">
                     <input
                       type="date"
-                      value={watch("startDate") || ""}
+                      value={startDate || ""}
                       onChange={(e) =>
                         setValue("startDate", e.target.value || null)
                       }
@@ -469,7 +470,7 @@ export function CreateTask({
                     />
                     <input
                       type="date"
-                      value={watch("dueDate") || ""}
+                      value={dueDate || ""}
                       onChange={(e) =>
                         setValue("dueDate", e.target.value || null)
                       }

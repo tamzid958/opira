@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -228,15 +228,15 @@ export function BoardList({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
-  const childIndex = useMemo(() => buildChildIndex(tasks), [tasks]);
-  const roots = useMemo(() => rootsOf(tasks), [tasks]);
+  const childIndex = buildChildIndex(tasks);
+  const roots = rootsOf(tasks);
 
   // Two buckets: "real" parents (root tasks that themselves have at
   // least one direct child in this slice) and the rest (leaf-roots
   // and orphans-by-filter), which collect into a single trailing
   // "Without parent" section so the eye doesn't have to chase
   // single-row sections at the top.
-  const { parents, loose } = useMemo(() => {
+  const { parents, loose } = (() => {
     const p = [];
     const l = [];
     for (const t of roots) {
@@ -245,7 +245,7 @@ export function BoardList({
       else l.push(t);
     }
     return { parents: p, loose: l };
-  }, [roots, childIndex]);
+  })();
 
   const [collapsed, setCollapsed] = useState(() => new Set());
   const toggle = (id) =>
@@ -258,10 +258,7 @@ export function BoardList({
   const [activeId, setActiveId] = useState(null);
   const [overId, setOverId] = useState(null);
 
-  const activeTask = useMemo(
-    () => (activeId ? tasks.find((t) => t.id === activeId) : null),
-    [activeId, tasks],
-  );
+  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
   const handleDragEnd = (e) => {
     setActiveId(null);

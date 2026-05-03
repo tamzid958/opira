@@ -1,0 +1,97 @@
+name: Release
+
+# Cuts a Docker image + a GitHub Release on every annotated semver tag.
+#
+#   git tag -a v0.2.0 -m "release v0.2.0"
+#   git push origin v0.2.0
+#
+# Output:
+#   ghcr.io/<owner>/opira:0.2.0
+#   ghcr.io/<owner>/opira:0.2
+#   ghcr.io/<owner>/opira:latest
+#   GitHub Release with auto-generated notes (commits since the previous tag)
+#
+# The image is built for linux/amd64 + linux/arm64 (works on Intel servers,
+# AWS Graviton, Apple Silicon dev machines). Visibility is controlled by the
+# package's setting in GitHub — make it public once and anyone can pull
+# without auth (no PAT required on the deployment server).
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.2.0). Must already exist."
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/opira
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          body: |
+            ## Pull the prebuilt image
+
+            ```bash
+            docker pull ghcr.io/${{ github.repository_owner }}/opira:${{ github.event.inputs.tag && github.event.inputs.tag || github.ref_name }}
+            ```
+
+            Multi-arch (`linux/amd64` + `linux/arm64`). All env vars are read at runtime — see [README → Configuration](https://github.com/${{ github.repository }}#-configuration). One image, swap envs at `docker run`, no rebuild.
+
+            ## Build from source
+
+            ```bash
+            git clone https://github.com/${{ github.repository }}.git
+            cd opira && cp .env.local.example .env
+            docker compose up -d --build
+            ```

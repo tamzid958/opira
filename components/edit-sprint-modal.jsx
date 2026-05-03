@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ export function EditSprintModal({ sprint, projectId, onClose }) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors, isSubmitting },
   } = useForm({
@@ -55,8 +55,8 @@ export function EditSprintModal({ sprint, projectId, onClose }) {
       goal: sprint.goal || "",
     },
   });
-  const start = watch("start");
-  const end = watch("end");
+  const start = useWatch({ control, name: "start" });
+  const end = useWatch({ control, name: "end" });
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && !update.isPending && onClose?.();

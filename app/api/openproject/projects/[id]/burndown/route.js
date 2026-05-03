@@ -272,7 +272,7 @@ async function computeBurndown(projectId, sprintId) {
   }
 
   // ── Day walk + per-day remaining ──────────────────────────────────────
-  const wdays = workingDaySet();
+  const wdays = workingDaySet(process.env.OPENPROJECT_WORKING_DAYS);
   const start = new Date(sprint.start);
   const end = new Date(sprint.end);
   const today = new Date();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Users as UsersIcon } from "lucide-react";
 import { formatAbsDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -162,7 +162,7 @@ function InviteModal({ projectId, onClose, currentMemberIds }) {
   const [message, setMessage] = useState("");
 
   // Filter to users not already in the project. Search by name/email.
-  const candidates = useMemo(() => {
+  const candidates = (() => {
     const all = usersQ.data || [];
     const exclude = new Set(currentMemberIds.map(String));
     const q = query.trim().toLowerCase();
@@ -174,7 +174,7 @@ function InviteModal({ projectId, onClose, currentMemberIds }) {
         (u.email || "").toLowerCase().includes(q),
       )
       .slice(0, 50);
-  }, [usersQ.data, currentMemberIds, query]);
+  })();
 
   const submit = async () => {
     if (!picked || roleIds.length === 0) return;
@@ -444,7 +444,7 @@ export function Members({ projectId, projectName }) {
   const [sort, setSort] = useState("name");
 
   // Per-role counts drive the chip filter row at the top.
-  const roleCounts = useMemo(() => {
+  const roleCounts = (() => {
     const acc = new Map();
     for (const m of membersQ.data || []) {
       for (const r of m.roleNames || []) {
@@ -452,9 +452,9 @@ export function Members({ projectId, projectName }) {
       }
     }
     return [...acc.entries()].sort((a, b) => b[1] - a[1]);
-  }, [membersQ.data]);
+  })();
 
-  const filtered = useMemo(() => {
+  const filtered = (() => {
     const list = membersQ.data || [];
     const q = query.trim().toLowerCase();
     let out = list;
@@ -475,7 +475,7 @@ export function Members({ projectId, projectName }) {
       }
       return (a.principalName || "").localeCompare(b.principalName || "");
     });
-  }, [membersQ.data, query, roleFilter, sort]);
+  })();
 
   const onChangeRoles = async (member, nextRoleIds) => {
     if (!nextRoleIds.length) {

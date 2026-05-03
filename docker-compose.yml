@@ -3,30 +3,41 @@
 # (nginx, Traefik, your cloud's load balancer) — this stack is the
 # app only, not the edge.
 #
-# Quick start
-#   1. cp .env.local.example .env
-#      …fill in OPENPROJECT_OAUTH_CLIENT_ID / _SECRET / AUTH_SECRET / etc.
-#      Set AUTH_URL to the public origin you'll serve from.
-#   2. docker compose up -d --build
+# Quick start (no clone needed)
+#   1. curl -fsSLO https://raw.githubusercontent.com/tamzid958/opira/main/docker-compose.yml
+#      curl -fsSLO https://raw.githubusercontent.com/tamzid958/opira/main/.env.local.example
+#      mv .env.local.example .env
+#      $EDITOR .env             # fill in OAuth client / secret / AUTH_SECRET / AUTH_URL
+#   2. docker compose up -d
 #   3. Visit http://localhost:3000
+#
+# To upgrade later: `docker compose pull && docker compose up -d`. No
+# rebuild — every env var is read at request time, same image across envs.
+#
+# To build from source instead of pulling: `docker compose up -d --build`
+# (works because both `image:` and `build:` are declared below).
 
 services:
   opira:
+    image: ghcr.io/tamzid958/opira:latest
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # NEXT_PUBLIC_* vars are baked into the client bundle at
-        # build time — they have to be in scope here, not just at
-        # runtime. Defaulted to "" so an unset value doesn't break
-        # `docker compose build`. Every other env var is server-only
-        # and comes in via `env_file` at runtime; see .env.local.example
-        # for the full list.
-        NEXT_PUBLIC_OPENPROJECT_URL:                ${NEXT_PUBLIC_OPENPROJECT_URL:-}
-        NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD: ${NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD:-}
-    image: opira:latest
     restart: unless-stopped
     env_file:
       - .env
     ports:
       - "3000:3000"
+
+  # Optional: auto-pull new images and restart the container when a
+  # new release lands on ghcr.io. Polls every 6h. Comment out the whole
+  # block if you'd rather upgrade manually (or pair it with the in-app
+  # "new version available" banner).
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup --interval 21600 opira
+    profiles:
+      - autoupdate

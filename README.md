@@ -17,53 +17,30 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blueviolet.svg)](./CONTRIBUTING.md)
 [![Made with ♥ by Tamzid](https://img.shields.io/badge/made_by-Tamzid_Ahmed-ec4899.svg)](https://github.com/tamzid958)
 
-[Quick Start](#-quick-start) · [Docker](#-docker) · [Configuration](#-configuration) · [Architecture](#-architecture) · [Roadmap](#-roadmap) · [Contributing](#-contributing)
+[Quick Start](#-quick-start) · [Docker](#-docker) · [Configuration](#-configuration) · [Architecture](#-architecture) · [Contributing](#-contributing)
 
 </div>
 
 ---
 
-## 📚 Table of contents
-
-1. [Why Opira](#-why-opira)
-2. [Feature matrix](#-feature-matrix)
-3. [Screenshots](#-screenshots)
-4. [Quick start](#-quick-start)
-5. [Docker](#-docker)
-6. [Configuration](#-configuration)
-7. [Register the OAuth client](#-register-the-oauth-client-in-openproject)
-8. [Routes & deep links](#-routes--deep-links)
-9. [Architecture](#-architecture)
-10. [Project layout](#-project-layout)
-11. [Tech stack](#-tech-stack)
-12. [Scripts](#-scripts)
-13. [Performance & footprint](#-performance--footprint)
-14. [Security model](#-security-model)
-15. [Roadmap](#-roadmap)
-16. [Contributing](#-contributing)
-17. [FAQ](#-faq)
-18. [License & credits](#-license--credits)
-
----
-
 ## 🚀 Why Opira
 
-OpenProject is a powerful, open-source, fully-featured project management server. Its UI is comprehensive — and that is precisely the problem. Teams arriving from Jira, Linear, or Shortcut often find the screens dense, the keyboard shortcuts sparse, and the daily-driver flows (board → backlog → sprint review) more clicks than they should be.
+OpenProject is a powerful, open-source project-management server. Its UI is comprehensive — and that is precisely the problem. Teams arriving from Jira, Linear, or Shortcut find the screens dense, the shortcuts sparse, and the daily flows (board → backlog → review) more clicks than they should be.
 
 **Opira fixes the front-end without forking the back-end.**
 
 | | Stock OpenProject UI | **Opira** |
 |---|---|---|
-| Sprint board | Generic board macro | Per-sprint kanban with status-aware columns, **drag-and-drop**, swimlanes |
-| Backlog | Work-package list | Sprint-grouped sections, **bulk move/assign/delete**, sub-task expansion |
-| Sprints | Versions screen | Native lifecycle (`open` → `locked` → `closed`) with start/complete/lock modals |
-| Reports | External plugin | **Burndown + velocity** built-in, per sprint |
-| Search | Page-level filters | **⌘K command palette** — projects, work packages, people |
+| Sprint board | Generic board macro | Per-sprint kanban, **drag-and-drop**, swimlanes |
+| Backlog | Work-package list | Sprint-grouped, **bulk move/assign/delete**, sub-task expansion |
+| Sprints | Versions screen | Native lifecycle (`open` → `locked` → `closed`) with full modals |
+| Reports | External plugin | **Burndown + velocity + capacity** built-in |
+| Search | Page-level filters | **⌘K command palette** across projects, work packages, people |
 | Permissions | Role-name guesswork | Driven by **live `_links` from each resource** |
 | Stack | Rails + ERB | **Next.js 16 · React 19 · Tailwind v4** |
 | Lock-in | None — Opira is just a different lens on the same API | |
 
-> Opira is a **front-end only**. Bring your own OpenProject server (self-hosted Community Edition runs in one `docker run`).
+> **Front-end only.** Bring your own OpenProject server (self-hosted Community Edition runs in one `docker run`).
 
 ---
 
@@ -72,11 +49,10 @@ OpenProject is a powerful, open-source, fully-featured project management server
 <details open>
 <summary><strong>Planning & execution</strong></summary>
 
-- ✅ **Drag-and-drop sprint board**, scoped per sprint, with status-aware columns
-- ✅ Filters: search · assignee · type · tag · status chip
-- ✅ **Backlog** with bulk move, bulk assign, bulk delete, sub-task expansion
+- ✅ **Drag-and-drop sprint board** — status-aware columns, swimlanes, search/assignee/type/tag/status filters
+- ✅ **Backlog** with bulk move/assign/delete + sub-task expansion
 - ✅ **One-click sprint sync** — align dates, roll up story points
-- ✅ Sprint lifecycle modals: create · edit · start · complete · lock · unlock · reopen
+- ✅ Sprint lifecycle: create · edit · start · complete · lock · unlock · reopen
 - ✅ **Timeline** view with sprint-grouped date bands
 - ✅ **JSON import** — drop a tree of work packages into a sprint
 
@@ -85,24 +61,22 @@ OpenProject is a powerful, open-source, fully-featured project management server
 <details open>
 <summary><strong>Visibility & reporting</strong></summary>
 
-- ✅ **Burndown** chart per sprint
-- ✅ **Velocity** rollup across recent sprints
-- ✅ **Documents** reader — two-pane, with embedded attachments proxied so they actually render
+- ✅ **Burndown** + **velocity** + **capacity** per sprint
+- ✅ **Documents reader** — two-pane, embedded attachments proxied so they actually render
 - ✅ Activity feed, watchers, file links, time entries, revisions, relations
 
 </details>
 
 <details open>
-<summary><strong>Collaboration & quality of life</strong></summary>
+<summary><strong>Collaboration & QoL</strong></summary>
 
-- ✅ **⌘K / Ctrl-K command palette** — fast jumps across projects, work packages, members
-- ✅ **Tiptap rich text** for descriptions and comments — sanitised on render
-- ✅ **Notifications** with mark-all-read
-- ✅ **Members** management with role chips and invite/remove flows
-- ✅ **Tags** browser
-- ✅ **Permission-aware UI** — every action button reflects the live `_links` of the resource
-- ✅ **Reminders** panel, **shortcuts** modal, **offline queue** for resilient mutations
-- ✅ Optimistic updates with rollback — the UI never lies to you
+- ✅ **⌘K / Ctrl-K command palette** across projects, work packages, members
+- ✅ **Tiptap rich text** with @-mentions; sanitised on render
+- ✅ **Permission-aware UI** — every action button reflects the resource's live `_links`
+- ✅ **Notifications**, **members**, **tags**, **reminders**, **shortcuts** modal
+- ✅ **Offline queue** — mutations replay on reconnect
+- ✅ **Optimistic updates with rollback** — the UI never lies to you
+- ✅ **In-app upgrade banner** — signed-in users see when a new release is available
 
 </details>
 
@@ -124,53 +98,57 @@ OpenProject is a powerful, open-source, fully-featured project management server
 
 ## ⚡ Quick start
 
-> **Prerequisites** — Node.js **22+**, npm 10+, and a reachable OpenProject **v3** instance you can sign in to as an administrator (to register the OAuth app).
+> Node **22+**, npm 10+, and a reachable OpenProject **v3** instance you can sign in to as an administrator (to register the OAuth app).
 
 ```bash
-# 1. Clone
-git clone https://github.com/tamzid958/opira.git
-cd opira
-
-# 2. Install
+git clone https://github.com/tamzid958/opira.git && cd opira
 npm install
-
-# 3. Configure
-cp .env.local.example .env.local      # fill in the four required values
-$EDITOR .env.local
-
-# 4. Run
+cp .env.local.example .env.local && $EDITOR .env.local      # fill in the four required values
 npm run dev
 ```
 
 Open <http://localhost:3000>. The first request bounces through OpenProject for OAuth sign-in.
 
-> 💡 Don't have an OpenProject server handy? Start one in 30 seconds:
-> ```bash
-> docker run -d -p 8080:80 --name openproject openproject/openproject:14
-> ```
-> Then point `NEXT_PUBLIC_OPENPROJECT_URL` at `http://localhost:8080`.
+> 💡 No OpenProject server handy? `docker run -d -p 8080:80 openproject/openproject:14`, then point `OPENPROJECT_URL` at `http://localhost:8080`.
 
 ---
 
 ## 🐳 Docker
 
-Opira ships a multi-stage `Dockerfile` (~170 MB compressed, non-root, healthchecked) and a ready-to-run `docker-compose.yml`.
+Multi-stage `Dockerfile` (~170 MB compressed, non-root, healthchecked) + ready-to-run `docker-compose.yml`. Two install paths — same image, both honour live env-var swaps without a rebuild.
+
+### Option A — Pull the prebuilt image (recommended)
+
+Every tagged release publishes a multi-arch (`linux/amd64` + `linux/arm64`) image to **GitHub Container Registry**. The image is **public** — no PAT or `docker login` needed. No clone needed either.
 
 ```bash
-# 1. Configure
-cp .env.local.example .env
-$EDITOR .env                          # set AUTH_URL to the public origin
-
-# 2. Build + run
-docker compose up -d --build
-
-# 3. Visit
-open http://localhost:3000
+curl -fsSLO https://raw.githubusercontent.com/tamzid958/opira/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/tamzid958/opira/main/.env.local.example
+mv .env.local.example .env && $EDITOR .env      # OAuth client + secret + AUTH_SECRET + AUTH_URL
+docker compose up -d                            # → http://localhost:3000
 ```
 
-Put a TLS-terminating reverse proxy (nginx, Traefik, your cloud's load balancer) **in front** of the container — Opira handles the app, not the edge.
+Upgrade later: `docker compose pull && docker compose up -d`. Pin a version by editing `docker-compose.yml` (`:latest` → `:0.2.0`).
 
-> ⚠ `NEXT_PUBLIC_*` values are baked into the client bundle at build time. If you change them, rebuild: `docker compose build --no-cache opira`.
+**Auto-update (opt-in).** The shipped compose includes a [Watchtower](https://containrrr.dev/watchtower/) service that polls ghcr.io every 6h and restarts the container when a new image lands:
+
+```bash
+docker compose --profile autoupdate up -d
+```
+
+Pair it with the in-app **"new version available" banner** — the banner notifies signed-in users; Watchtower applies the upgrade on its next cycle.
+
+### Option B — Build from source
+
+For forks / local modifications.
+
+```bash
+git clone https://github.com/tamzid958/opira.git && cd opira
+cp .env.local.example .env && $EDITOR .env
+docker compose up -d --build
+```
+
+> 💡 All env vars are read at request time. Same image runs in any environment — change `.env` and `docker compose up -d` (no rebuild). Put a TLS-terminating reverse proxy (nginx, Traefik, your cloud's LB) in front.
 
 ---
 
@@ -178,31 +156,31 @@ Put a TLS-terminating reverse proxy (nginx, Traefik, your cloud's load balancer)
 
 | Variable | Required | Purpose |
 |---|:---:|---|
-| `NEXT_PUBLIC_OPENPROJECT_URL` | ✅ | Base URL of your OpenProject instance, e.g. `https://op.example.com`. Used by both server (OAuth + proxy) and client (account deep-link). |
-| `OPENPROJECT_OAUTH_CLIENT_ID` | ✅ | Client ID of the OAuth application registered in OpenProject. |
-| `OPENPROJECT_OAUTH_CLIENT_SECRET` | ✅ | Matching client secret. |
-| `AUTH_SECRET` | ✅ | 32+ byte secret signing NextAuth cookies. Generate: `openssl rand -base64 32`. |
+| `OPENPROJECT_URL` | ✅ | Base URL of your OpenProject instance, e.g. `https://op.example.com`. |
+| `OPENPROJECT_OAUTH_CLIENT_ID` | ✅ | OAuth app client ID (see [OAuth setup](#-register-the-oauth-client-in-openproject)). |
+| `OPENPROJECT_OAUTH_CLIENT_SECRET` | ✅ | OAuth app client secret. |
+| `AUTH_SECRET` | ✅ | 32+ byte secret signing NextAuth cookies. `openssl rand -base64 32`. |
 | `AUTH_URL` | prod only | Public origin. Auto-detected in dev; **set explicitly in production**. |
-| `NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD` | optional | Field carrying story points. Top-level numeric (`storyPoints`, default) or a custom-field key (`customField7`). |
+| `OPENPROJECT_STORY_POINTS_FIELD` | optional | `storyPoints` (default) or a custom-field key like `customField7`. |
+| `OPENPROJECT_WORKING_DAYS` | optional | Comma-separated day prefixes for burndown / capacity (default `Mon,Tue,Wed,Thu,Fri`). |
+| `HOURS_PER_POINT` | optional | Hours-per-point for the capacity view (default `4`). |
 
-Server-only secrets (`AUTH_SECRET`, `OPENPROJECT_OAUTH_CLIENT_SECRET`) are read at runtime and **never reach the browser**.
+All env vars are read at request time on the server. Values the client needs (`OPENPROJECT_URL`, `OPENPROJECT_STORY_POINTS_FIELD`, `OPENPROJECT_WORKING_DAYS`) are surfaced through React context — no `NEXT_PUBLIC_*` baking, no rebuild to change envs. Server-only secrets (`AUTH_SECRET`, OAuth client secret) **never reach the browser**.
 
 ---
 
 ## 🔑 Register the OAuth client in OpenProject
 
-1. Sign in to your OpenProject instance as an administrator.
-2. Navigate to **Administration → Authentication → OAuth applications → Add**.
-3. Fill the form:
+Once, in your OpenProject admin: **Administration → Authentication → OAuth applications → Add**.
 
-   | Field | Value |
-   |---|---|
-   | **Name** | `Opira` (or anything memorable) |
-   | **Redirect URI** | `<AUTH_URL>/api/auth/callback/openproject`<br>_locally:_ `http://localhost:3000/api/auth/callback/openproject` |
-   | **Confidential** | ✅ yes |
-   | **Scopes** | `api_v3` |
+| Field | Value |
+|---|---|
+| **Name** | `Opira` (or anything memorable) |
+| **Redirect URI** | `<AUTH_URL>/api/auth/callback/openproject`<br>_locally:_ `http://localhost:3000/api/auth/callback/openproject` |
+| **Confidential** | ✅ yes |
+| **Scopes** | `api_v3` |
 
-4. **Save**, then copy the generated **Client ID** and **Client Secret** into `.env.local`.
+Save, then copy the generated **Client ID** + **Client Secret** into `.env`.
 
 > Refresh tokens rotate transparently in [auth.js](./auth.js) with a 60s buffer; failures set `token.error = "RefreshAccessTokenError"` and redirect to `/sign-in`.
 
@@ -212,16 +190,12 @@ Server-only secrets (`AUTH_SECRET`, `OPENPROJECT_OAUTH_CLIENT_SECRET`) are read 
 
 | Path | Purpose |
 |---|---|
-| `/` | Redirects to `/projects`. |
-| `/projects` | Bounces to your last-visited project, or the first one you can access. |
+| `/` → `/projects` | Bounces to your last-visited project, or the first one accessible. |
 | `/projects/<id>/board` | Sprint board with filters and switcher. |
 | `/projects/<id>/backlog` | Sprint sections with bulk operations. |
 | `/projects/<id>/timeline` | Calendar-style timeline. |
-| `/projects/<id>/reports` | Burndown + velocity. |
-| `/projects/<id>/overview` | Project dashboard. |
-| `/projects/<id>/tags` | Categories browser. |
-| `/projects/<id>/members` | Project memberships. |
-| `/projects/<id>/documents` | Documents reader. |
+| `/projects/<id>/reports` | Burndown + velocity + capacity. |
+| `/projects/<id>/{overview,tags,members,documents}` | Project dashboard, categories, memberships, documents reader. |
 | `/account` | Identity + deep-link to OpenProject account settings. |
 
 **Modal state rides URL params** — `?wp=<id>` opens a work package, `?create=1` opens the create dialog, `?s=<id>` selects a board sprint. Deep links are shareable and the back button just works.
@@ -233,43 +207,39 @@ Server-only secrets (`AUTH_SECRET`, `OPENPROJECT_OAUTH_CLIENT_SECRET`) are read 
 Three layers, one promise: **the access token never touches the browser.**
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                              BROWSER                                 │
-│  React 19 components ── TanStack Query hooks ── URL params (state)   │
-└────────────────────────────────┬─────────────────────────────────────┘
-                                 │  fetchJson()  (lib/api-client.js)
-                                 ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                  NEXT.JS SERVER  (route handlers)                    │
+┌───────────────────────────────────────────────────────────────────┐
+│                            BROWSER                                │
+│  React 19 components ── TanStack Query hooks ── URL params (state) │
+└─────────────────────────────────┬─────────────────────────────────┘
+                                  │  fetchJson()  (lib/api-client.js)
+                                  ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                NEXT.JS SERVER  (route handlers)                   │
 │  app/api/openproject/*  ── opFetch / opPatchWithLock / errorResponse │
-│  Reads OAuth bearer from session, injects Authorization header       │
-└────────────────────────────────┬─────────────────────────────────────┘
-                                 │  HTTPS  (HAL JSON)
-                                 ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│              OPENPROJECT v3 API  (your instance)                     │
-│  Permissions · work packages · versions (sprints) · users · …        │
-└──────────────────────────────────────────────────────────────────────┘
+│  Reads OAuth bearer from session, injects Authorization header    │
+└─────────────────────────────────┬─────────────────────────────────┘
+                                  │  HTTPS  (HAL JSON)
+                                  ▼
+┌───────────────────────────────────────────────────────────────────┐
+│              OPENPROJECT v3 API  (your instance)                  │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-**Layer 1 — Authentication** ([auth.js](./auth.js))
-Hand-rolled OAuth provider (OpenProject has no OIDC discovery). JWT callback rotates refresh tokens with a 60s buffer; [auth.config.js](./auth.config.js) is the edge-safe slice consumed by middleware.
-
-**Layer 2 — Server proxy** ([app/api/openproject/](./app/api/openproject))
-Every browser request to OpenProject is brokered server-side. The OAuth bearer is read from the session and injected here. Use [`opFetch` / `opPatchWithLock` / `fetchAllPages`](./lib/openproject/client.js) — never `fetch` against OpenProject directly from a route handler.
-
-**Layer 3 — Client** ([components/](./components))
-Feature components consume hooks from [lib/hooks/](./lib/hooks). Mutations are optimistic with rollback. Modal state lives in URL params so deep links and back/forward behave like the rest of the web.
+- **Layer 1 — Auth** ([auth.js](./auth.js)). Hand-rolled OAuth provider (OpenProject has no OIDC discovery). JWT callback rotates refresh tokens; [auth.config.js](./auth.config.js) is the edge-safe slice consumed by middleware.
+- **Layer 2 — Server proxy** ([app/api/openproject/](./app/api/openproject)). Every browser request is brokered server-side; OAuth bearer injected here. Use [`opFetch` / `opPatchWithLock` / `fetchAllPages`](./lib/openproject/client.js) — never `fetch` against OpenProject directly.
+- **Layer 3 — Client** ([components/](./components)). Feature components consume hooks from [lib/hooks/](./lib/hooks). Mutations are optimistic with rollback. Modal state lives in URL params.
 
 ### The bits that bite (read before editing the API layer)
 
-- 🔒 **Optimistic locking** — most resources carry `lockVersion`. `PATCH` without it fails 409. Use [`opPatchWithLock`](./lib/openproject/client.js) — auto-fetches the current `lockVersion` and retries once on conflict. Surface `LOCK_CONFLICT` as _"someone else updated this — refresh"_.
-- 🔗 **HAL JSON everywhere** — collections under `_embedded.elements`, navigation/permissions under `_links`. Flatten through [lib/openproject/mappers.js](./lib/openproject/mappers.js); never leak HAL into components.
-- 🛡 **Live permissions** — each resource's `_links` says what the *current* user can do. Drive enabled/disabled state via [`usePermissions`](./lib/hooks/use-permissions.js); never re-derive from role names.
+- 🔒 **Optimistic locking** — most resources carry `lockVersion`. `PATCH` without it fails 409. Use [`opPatchWithLock`](./lib/openproject/client.js); surface `LOCK_CONFLICT` as _"someone else updated this — refresh"_.
+- 🔗 **HAL JSON** — collections under `_embedded.elements`, navigation/permissions under `_links`. Flatten through [mappers.js](./lib/openproject/mappers.js); never leak HAL into components.
+- 🛡 **Live permissions** — each resource's `_links` says what the *current* user can do. Drive UI gating via [`usePermissions`](./lib/hooks/use-permissions.js); never re-derive from role names.
 - 🧮 **Filters are JSON** — OpenProject's `filters` query param is a JSON-encoded array of `{ field: { operator, values } }`. Use [`buildFilters`](./lib/openproject/client.js).
-- 📄 **Pagination** — max `pageSize` is 1000, pages are 1-indexed via `offset`. Walk with [`fetchAllPages`](./lib/openproject/client.js) (default cap 5000).
-- 🎯 **Story points field is configurable** — always read through [lib/openproject/story-points.js](./lib/openproject/story-points.js); never hardcode.
-- 🏃 **Sprints are OpenProject `version` resources** with `open / locked / closed` statuses. There is no separate sprint entity.
+- 📄 **Pagination** — max `pageSize` 1000, 1-indexed via `offset`. Walk with [`fetchAllPages`](./lib/openproject/client.js) (default cap 5000).
+- 🎯 **Story points field is configurable** — always read through [story-points.js](./lib/openproject/story-points.js).
+- 🏃 **Sprints are OpenProject `version` resources** with `open / locked / closed` statuses.
+
+Detailed agent-facing conventions live in [CLAUDE.md](./CLAUDE.md).
 
 ---
 
@@ -278,35 +248,16 @@ Feature components consume hooks from [lib/hooks/](./lib/hooks). Mutations are o
 ```text
 opira/
 ├─ app/                                  Next.js App Router
-│  ├─ layout.jsx                         root server layout
-│  ├─ loading.jsx · error.jsx · not-found.jsx
-│  ├─ page.jsx                           redirect → /projects
-│  ├─ projects/
-│  │  ├─ page.jsx                        project picker
-│  │  └─ [projectId]/
-│  │     ├─ layout.jsx                   chrome + cross-page modals
-│  │     ├─ board/page.jsx
-│  │     ├─ backlog/page.jsx
-│  │     ├─ timeline/page.jsx
-│  │     ├─ reports/page.jsx
-│  │     ├─ overview/page.jsx
-│  │     ├─ tags/page.jsx
-│  │     ├─ members/page.jsx
-│  │     └─ documents/page.jsx
+│  ├─ layout.jsx · page.jsx · {loading,error,not-found}.jsx
+│  ├─ projects/[projectId]/{board,backlog,timeline,reports,overview,tags,members,documents}/
 │  ├─ api/openproject/*                  authenticated proxy routes
+│  ├─ api/updates/check/                 GitHub-release poll for the upgrade banner
 │  └─ account/page.jsx
-├─ components/
-│  ├─ ui/                                shared primitives (Avatar, Menu, …)
-│  └─ …                                  feature components
-├─ lib/
-│  ├─ hooks/                             TanStack Query wrappers, URL helpers
-│  ├─ openproject/                       mappers, OAuth client, route utils
-│  ├─ offline/                           offline queue + runner
-│  └─ server/                            server-only helpers
+├─ components/{ui/,*.jsx}                shared primitives + feature components
+├─ lib/{hooks,openproject,offline,server}/
 ├─ auth.js · auth.config.js              NextAuth wiring
 ├─ Dockerfile · docker-compose.yml       container build + stack
-├─ next.config.mjs · postcss.config.mjs · eslint.config.mjs
-└─ jsconfig.json                         '@/*' path alias
+└─ next.config.mjs · jsconfig.json       framework + '@/*' alias
 ```
 
 ---
@@ -322,9 +273,7 @@ opira/
 | Auth | [NextAuth.js v5](https://authjs.dev/) | OAuth 2.0 + PKCE, refresh-token rotation |
 | Forms | [react-hook-form](https://react-hook-form.com/) + [zod](https://zod.dev/) | validation + shape inference |
 | Editor | [Tiptap](https://tiptap.dev/) + [DOMPurify](https://github.com/cure53/DOMPurify) | rich text, sanitised on render |
-| DnD | [dnd-kit](https://dndkit.com/) | accessible drag-and-drop |
-| Icons | [lucide-react](https://lucide.dev/) | tree-shakeable |
-| Toasts | [sonner](https://sonner.emilkowal.ski/) | minimal, themed |
+| DnD · Icons · Toasts | [dnd-kit](https://dndkit.com/) · [lucide-react](https://lucide.dev/) · [sonner](https://sonner.emilkowal.ski/) | accessible · tree-shakeable · themed |
 | Lang | **JavaScript + JSDoc** (not TypeScript by design) | `@/*` alias via `jsconfig.json` |
 
 ---
@@ -333,69 +282,50 @@ opira/
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Start the dev server with Turbopack on `:3000`. |
+| `npm run dev` | Turbopack dev server on `:3000`. |
 | `npm run build` | Production build → `.next/standalone`. |
 | `npm run start` | Run the production build locally. |
 | `npm run lint` | ESLint via `eslint-config-next`. |
 
-> No test suite ships in this repo today. Don't add one without first agreeing on the testing strategy with the maintainer — see [CONTRIBUTING.md](./CONTRIBUTING.md#before-you-open-a-pr).
+> No test suite ships today. Don't add one without first agreeing on the strategy — see [CONTRIBUTING.md](./CONTRIBUTING.md#before-you-open-a-pr).
 
 ---
 
 ## 📦 Performance & footprint
 
-- **Image size** — ~170 MB compressed, multi-stage build, distroless-style alpine runner, non-root (`uid 1001`).
-- **Cold build** — ~2 min on a fresh machine; **~10 s** on a code-only change thanks to the `deps` cache layer.
-- **Production bundle** — `console.log/info/debug` are stripped (see [next.config.mjs](./next.config.mjs)); `error` and `warn` survive.
-- **Health probe** — `HEALTHCHECK` accepts any 1xx-4xx (a 307 to `/sign-in` means the server is up and routing).
+- **Image** — ~170 MB compressed, multi-stage build, alpine runner, non-root (`uid 1001`).
+- **Cold build** — ~2 min on a fresh machine; **~10 s** on a code-only change (deps cache layer).
+- **Bundle** — `console.log/info/debug` stripped in production (see [next.config.mjs](./next.config.mjs)); `error` and `warn` survive.
+- **Health probe** — accepts any 1xx-4xx (a 307 to `/sign-in` means the server is up and routing).
 
 ---
 
 ## 🛡 Security model
 
-- **Access tokens are server-side only.** The OAuth bearer is injected in route handlers and never serialised to the client.
+- **Access tokens are server-side only.** OAuth bearer is injected in route handlers and never serialised to the client.
 - **Refresh tokens rotate** with a 60s buffer; rotation failures redirect to `/sign-in`.
 - **HTML user content** (descriptions, comments) is **always** sanitised with `isomorphic-dompurify` on render. Never `dangerouslySetInnerHTML` raw OpenProject HTML.
-- **Permissions are not duplicated** in the client — every action button reads the live `_links` returned by the resource.
-- **CSRF** is handled by NextAuth's signed session cookies + same-origin proxy routes.
+- **Permissions** are read live from each resource's `_links`; never duplicated client-side.
+- **CSRF** handled via NextAuth signed session cookies + same-origin proxy routes.
 
 Suspected vulnerabilities → please report privately per [SECURITY.md](./SECURITY.md). Do **not** open a public issue.
 
 ---
 
-
 ## 🤝 Contributing
 
-PRs welcome — small or large. The full guide lives in [CONTRIBUTING.md](./CONTRIBUTING.md). The 30-second version:
+PRs welcome — small or large. Full guide in [CONTRIBUTING.md](./CONTRIBUTING.md). 30-second version:
 
 ```bash
-# Fork on GitHub, then:
-git clone https://github.com/<your-fork>/opira.git
-cd opira
-git checkout -b feat/<short-name>      # or fix/<…>, docs/<…>, refactor/<…>
-
+git clone https://github.com/<your-fork>/opira.git && cd opira
+git checkout -b feat/<short-name>          # or fix/, refactor/, docs/, chore/, test/
 # …make your changes…
-
-npm run lint && npm run build          # both must pass
-git add -A
+npm run lint && npm run build              # both must pass
 git commit -m "feat(board): swimlanes by assignee"
-git push -u origin feat/<short-name>
-
 # Open a PR against `master`. Attach a screen-record for any UI change.
 ```
 
-**Branch & commit conventions**
-
-| Prefix | Use for |
-|---|---|
-| `feat/` · `feat:` | net-new user-visible feature |
-| `fix/` · `fix:` | bug fix |
-| `refactor/` · `refactor:` | internal change, no behaviour shift |
-| `docs/` · `docs:` | README, JSDoc, in-repo guides |
-| `chore/` · `chore:` | tooling, deps, infra |
-| `test/` · `test:` | tests only |
-
-Everyone interacting in project spaces follows the [Code of Conduct](./CODE_OF_CONDUCT.md).
+Conventional prefixes: `feat:` · `fix:` · `refactor:` · `docs:` · `chore:` · `test:`. Code of Conduct in [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 
 ---
 
@@ -410,7 +340,7 @@ No. There is no application database, no cache server, no analytics. Every scree
 <details>
 <summary><strong>Can I run Opira against OpenProject Cloud?</strong></summary>
 
-Yes — point `NEXT_PUBLIC_OPENPROJECT_URL` at your hosted instance and register the OAuth app under your cloud admin. Opira doesn't care whether the server is self-hosted or hosted by Greenkeeper GmbH.
+Yes — point `OPENPROJECT_URL` at your hosted instance and register the OAuth app under your cloud admin. Opira doesn't care whether the server is self-hosted or hosted by Greenkeeper GmbH.
 </details>
 
 <details>
@@ -422,7 +352,7 @@ Pragmatism. The codebase uses JSDoc + `jsconfig.json` for editor tooling and avo
 <details>
 <summary><strong>Does Opira replace OpenProject?</strong></summary>
 
-No. Opira is a **front-end only** — it has zero meaning without an OpenProject server behind it. Think "Insomnia for REST" or "TablePlus for Postgres" — same data, different cockpit.
+No. Opira is a **front-end only** — zero meaning without an OpenProject server behind it. Think "Insomnia for REST" or "TablePlus for Postgres" — same data, different cockpit.
 </details>
 
 <details>
@@ -443,7 +373,7 @@ Mutations queue in [lib/offline/](./lib/offline) when the network drops and repl
 
 [MIT](./LICENSE) © **Tamzid Ahmed**
 
-Built on the shoulders of the [OpenProject](https://www.openproject.org/) team's excellent v3 API, the [Next.js](https://nextjs.org/) team's App Router, and every maintainer in the dependency tree above.
+Built on the [OpenProject](https://www.openproject.org/) team's excellent v3 API and the [Next.js](https://nextjs.org/) team's App Router.
 
 If Opira saves your team time, **⭐ star the repo** — that's how it finds its next user.
 

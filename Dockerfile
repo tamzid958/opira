@@ -24,15 +24,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# NEXT_PUBLIC_* values are baked into the client bundle at build
-# time, so they have to be in scope here. Server-only secrets
-# (AUTH_SECRET, OAuth client secret) stay out of the image and come
-# in via env_file at runtime.
-ARG NEXT_PUBLIC_OPENPROJECT_URL
-ARG NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD
-ENV NEXT_PUBLIC_OPENPROJECT_URL=${NEXT_PUBLIC_OPENPROJECT_URL} \
-    NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD=${NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD} \
-    NEXT_TELEMETRY_DISABLED=1 \
+# All env vars (`OPENPROJECT_URL`, `OPENPROJECT_STORY_POINTS_FIELD`,
+# `OPENPROJECT_WORKING_DAYS`, `HOURS_PER_POINT`, OAuth secrets, …) are
+# read at request time on the server; values that the client needs
+# travel via React context (see `lib/public-config.js`). Nothing is
+# baked into the bundle, so the same image runs in any environment —
+# no build-args required here.
+ENV NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production
 
 RUN npm run build

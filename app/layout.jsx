@@ -2,6 +2,7 @@ import { Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { Providers } from "@/components/providers";
 import { FOUC_GUARD_SCRIPT } from "@/components/theme-provider";
+import { getServerPublicConfig } from "@/lib/public-config";
 import "./globals.css";
 
 const inter = Inter({
@@ -31,6 +32,7 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const publicConfig = getServerPublicConfig();
   return (
     <html
       lang="en"
@@ -44,7 +46,7 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: FOUC_GUARD_SCRIPT }} />
       </head>
       <body>
-        <Providers>{children}</Providers>
+        <Providers publicConfig={publicConfig}>{children}</Providers>
         <Toaster
           position="bottom-right"
           closeButton

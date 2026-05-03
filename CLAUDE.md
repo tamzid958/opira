@@ -29,11 +29,11 @@ Guidance for Claude Code (and other AI agents) working in this repository.
 - **Permissions are live**: every resource's `_links` says which actions the *current* user can perform. Drive button enabled/disabled state from those links via [lib/hooks/use-permissions.js](lib/hooks/use-permissions.js) and [lib/openproject/permissions.js](lib/openproject/permissions.js); never re-derive from role names.
 - **Filters are JSON**: OpenProject's `filters` query param is a JSON-encoded array of `{ field: { operator, values } }`. Use [`buildFilters`](lib/openproject/client.js). Operator semantics differ per field — cross-check the v3 spec (memory: `reference_openproject_api_spec.md`) before changing route bodies.
 - **Pagination**: max `pageSize` is 1000, pages are 1-indexed via `offset`. Walk with [`fetchAllPages`](lib/openproject/client.js) (hard cap 5000 by default).
-- **Story points field**: configurable via `NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD` (top-level numeric or a `customFieldN` key). Always read points through [lib/openproject/story-points.js](lib/openproject/story-points.js) — never hardcode the field name.
+- **Story points field**: configurable via `OPENPROJECT_STORY_POINTS_FIELD` (top-level numeric or a `customFieldN` key). Server: read via `process.env`. Client: read via `usePublicConfig().storyPointsField` (see [components/config-provider.jsx](components/config-provider.jsx)). Always go through [lib/openproject/story-points.js](lib/openproject/story-points.js) on the server — never hardcode the field name.
 - **Sprints** are surfaced as native OpenProject `version` resources with `open / locked / closed` statuses. There is no separate sprint entity.
 - **No fallbacks — API is the source of truth.** Do not classify status / type / priority by keyword-matching the name. The OpenProject API exposes `status.isClosed`, `priority.position`, and `type.color`/`isDefault` — those fields are joined onto every mapped task by `mapWorkPackage` (`statusIsClosed`, `statusColor`, `typeColor`, `priorityColor`, `priorityPosition`). Helpers live in [lib/openproject/task-state.js](lib/openproject/task-state.js): `isTaskClosed`, `buildClosedStatusIdSet`, `priorityRank`. Never compare a task to bucket strings (`t.status === "done"`, `t.type === "epic"`, etc.) — those bucket fields no longer exist on tasks.
 - **"Epic-ness" is hierarchy, not type.** Use `task.hasChildren` (derived from `_links.children`) and `task.epic` (the parent's id) to identify parents / children. Never match on type names.
-- **Story points come from `NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD` only.** There is no keyname-scan or `estimatedTime` fallback in `pickStoryPoints`. If the configured field doesn't return a value, the task simply has no points.
+- **Story points come from `OPENPROJECT_STORY_POINTS_FIELD` only.** There is no keyname-scan or `estimatedTime` fallback in `pickStoryPoints`. If the configured field doesn't return a value, the task simply has no points.
 - **Work-package keys** are OpenProject's native numeric id (`#1234`). The mapper does not synthesise a Jira-style `PROJ-1234` key — show what OP returns.
 
 ## File and code conventions
@@ -50,13 +50,17 @@ Guidance for Claude Code (and other AI agents) working in this repository.
 
 | Variable | Required | Notes |
 |---|---|---|
-| `NEXT_PUBLIC_OPENPROJECT_URL` | yes | Read by both server (proxy + OAuth) and client. Single source of truth. |
+| `OPENPROJECT_URL` | yes | Upstream OpenProject base URL. Read on the server (proxy + OAuth); surfaced to the client at request time via `usePublicConfig()`. |
 | `OPENPROJECT_OAUTH_CLIENT_ID` / `_SECRET` | yes | OAuth app registered in OpenProject Admin → Authentication → OAuth applications. Scope: `api_v3`. Confidential: yes. |
 | `AUTH_SECRET` | yes | `openssl rand -base64 32`. |
 | `AUTH_URL` | prod | Public origin; auto-detected in dev. |
-| `NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD` | optional | `storyPoints` (default) or `customFieldN`. |
+| `OPENPROJECT_STORY_POINTS_FIELD` | optional | `storyPoints` (default) or `customFieldN`. Same server→client handoff as `OPENPROJECT_URL`. |
+| `OPENPROJECT_WORKING_DAYS` | optional | Comma/space-separated three-letter day prefixes for burndown / capacity (default Mon..Fri). |
+| `HOURS_PER_POINT` | optional | Numeric multiplier for the capacity calculation; server-only. |
 
 OAuth redirect URI: `<AUTH_URL>/api/auth/callback/openproject`.
+
+**Runtime config (no `NEXT_PUBLIC_*`).** All env vars are read at request time on the server. Values that the client needs are surfaced via React context: [lib/public-config.js](lib/public-config.js) defines `getServerPublicConfig()` (called once per request from [app/layout.jsx](app/layout.jsx)) and the values are wrapped by [`<ConfigProvider>`](components/config-provider.jsx) inside [components/providers.jsx](components/providers.jsx). Client code reads them with `usePublicConfig()`. This means the same Docker image can be deployed across environments without rebuilding — never reintroduce a `NEXT_PUBLIC_*` var.
 
 ## Scripts
 

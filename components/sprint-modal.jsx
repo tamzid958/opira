@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
@@ -31,7 +31,7 @@ function todayIso() {
 // ─────────────────────────────────────────────────────────────────
 // Capacity panel — committed-hours vs available-hours per member,
 // summed for a project-wide read at the top. Hours convert from
-// points via NEXT_PUBLIC_HOURS_PER_POINT (server-side default 4)
+// points via HOURS_PER_POINT (server-side default 4)
 // when a WP has no estimatedTime. Soft gate only: we surface
 // "over capacity" but don't block submission — the planner is the
 // source of truth.
@@ -136,7 +136,7 @@ function CapacityPanel({ capacity, overCommitted }) {
 
       <div className="text-[11px] text-fg-faint leading-snug">
         Hours convert from points at {hoursPerPoint}h/pt (configurable via
-        NEXT_PUBLIC_HOURS_PER_POINT).{" "}
+        HOURS_PER_POINT).{" "}
         {truncated && "Project has more than 50 members; only the first 50 were scanned. "}
         {overCommitted && "You can still start the sprint — this is a soft check."}
       </div>
@@ -151,7 +151,7 @@ export function SprintModal({ sprint, tasks, projectId, onClose, onStarted }) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm({
@@ -163,8 +163,8 @@ export function SprintModal({ sprint, tasks, projectId, onClose, onStarted }) {
       goal: sprint.goal || "",
     },
   });
-  const start = watch("start");
-  const end = watch("end");
+  const start = useWatch({ control, name: "start" });
+  const end = useWatch({ control, name: "end" });
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && !update.isPending && onClose?.();

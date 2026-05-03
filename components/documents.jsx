@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { formatAbsDate, formatRelDate } from "@/lib/utils";
 import { FileText } from "lucide-react";
 import { Icon } from "@/components/icons";
@@ -33,7 +33,7 @@ export function Documents({ projectId, projectName }) {
   const [sort, setSort] = useState("recent");
   const status = useApiStatus();
 
-  const docs = useMemo(() => {
+  const docs = (() => {
     const list = listQ.data || [];
     const q = query.trim().toLowerCase();
     let out = list;
@@ -48,7 +48,7 @@ export function Documents({ projectId, projectName }) {
       if (sort === "name") return (a.title || "").localeCompare(b.title || "");
       return (b.createdAt || "").localeCompare(a.createdAt || "");
     });
-  }, [listQ.data, query, sort]);
+  })();
 
   // Auto-select the first document when the list loads or the active
   // selection no longer exists in the visible set. Computed during render

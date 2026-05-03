@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Tag as TagLucide } from "lucide-react";
 import { TagPill } from "@/components/ui/tag-pill";
 import { Avatar } from "@/components/ui/avatar";
@@ -148,7 +148,7 @@ export function Tags({ projectId, projectName, tasks, onFilter }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("usage");
 
-  const tagsWithCounts = useMemo(() => {
+  const tagsWithCounts = (() => {
     const cats = categoriesQ.data || [];
     const enriched = cats.map((c) => {
       const used = tasks.filter((t) => (t.labels || []).includes(c.name));
@@ -167,16 +167,10 @@ export function Tags({ projectId, projectName, tasks, onFilter }) {
       }
       return b.count - a.count || a.name.localeCompare(b.name);
     });
-  }, [categoriesQ.data, tasks, query, sort]);
+  })();
 
-  const totalUsage = useMemo(
-    () => tagsWithCounts.reduce((s, t) => s + t.count, 0),
-    [tagsWithCounts],
-  );
-  const unusedCount = useMemo(
-    () => tagsWithCounts.filter((t) => t.count === 0).length,
-    [tagsWithCounts],
-  );
+  const totalUsage = tagsWithCounts.reduce((s, t) => s + t.count, 0);
+  const unusedCount = tagsWithCounts.filter((t) => t.count === 0).length;
 
   const opLink = (() => {
     const base = status.data?.baseUrl;

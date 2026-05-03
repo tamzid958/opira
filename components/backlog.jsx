@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -439,8 +439,8 @@ function BacklogSection({
       n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
-  const childIndex = useMemo(() => buildChildIndex(tasks), [tasks]);
-  const roots = useMemo(() => rootsOf(tasks), [tasks]);
+  const childIndex = buildChildIndex(tasks);
+  const roots = rootsOf(tasks);
 
   const dropId = sprint ? sprint.id : "backlog";
   const { setNodeRef } = useDroppable({ id: dropId });
@@ -871,41 +871,28 @@ export function Backlog({
   // pagination) and the rest of the sprints (sorted latest-first, then
   // paginated). The split is by name only — OP doesn't model a separate
   // "backlog" version type, so we look for the literal label.
-  const sortedAllSprints = useMemo(
-    () => sortSprintsByRecency(Array.isArray(sprints) ? sprints : []),
-    [sprints],
-  );
-  const backlogSprints = useMemo(
-    () => sortedAllSprints.filter(isBacklogSprint),
-    [sortedAllSprints],
-  );
-  const sprintList = useMemo(
-    () => sortedAllSprints.filter((s) => !isBacklogSprint(s)),
-    [sortedAllSprints],
-  );
+  const sortedAllSprints = sortSprintsByRecency(Array.isArray(sprints) ? sprints : []);
+  const backlogSprints = sortedAllSprints.filter(isBacklogSprint);
+  const sprintList = sortedAllSprints.filter((s) => !isBacklogSprint(s));
   // When the caller pins a sprint (filter on URL), we render only that
   // sprint and skip pagination. Otherwise we render a fixed-size window
   // of the sorted list, starting from the latest.
-  const pinnedSprint = useMemo(
-    () =>
-      pinnedSprintId
-        ? sortedAllSprints.find((s) => s.id === pinnedSprintId) || null
-        : null,
-    [pinnedSprintId, sortedAllSprints],
-  );
+  const pinnedSprint = pinnedSprintId
+    ? sortedAllSprints.find((s) => s.id === pinnedSprintId) || null
+    : null;
   const sprintPageCount = Math.max(
     1,
     Math.ceil(sprintList.length / SPRINT_PAGE_SIZE),
   );
   const safeSprintPage = Math.min(sprintPageIndex, sprintPageCount - 1);
-  const visibleSprints = useMemo(() => {
+  const visibleSprints = (() => {
     if (pinnedSprint) return [pinnedSprint];
     const start = safeSprintPage * SPRINT_PAGE_SIZE;
     return sprintList.slice(start, start + SPRINT_PAGE_SIZE);
-  }, [pinnedSprint, sprintList, safeSprintPage]);
+  })();
   // Single pass over tasks: bucket by sprint id (or "" for unscheduled) so
   // the per-sprint render below is O(tasks) instead of O(sprints × tasks).
-  const tasksBySprint = useMemo(() => {
+  const tasksBySprint = (() => {
     const m = new Map();
     for (const t of tasks) {
       const k = t.sprint || "";
@@ -914,7 +901,7 @@ export function Backlog({
       else m.set(k, [t]);
     }
     return m;
-  }, [tasks]);
+  })();
   const unscheduled = tasksBySprint.get("") || [];
 
   const onSelectChange = (id, v) =>
@@ -935,10 +922,7 @@ export function Backlog({
     });
   const clearSelection = () => setSelected(new Set());
 
-  const totalUnassigned = useMemo(
-    () => tasks.filter((t) => !t.assignee).length,
-    [tasks],
-  );
+  const totalUnassigned = tasks.filter((t) => !t.assignee).length;
 
   if (sortedAllSprints.length === 0 && tasks.length === 0) {
     return (

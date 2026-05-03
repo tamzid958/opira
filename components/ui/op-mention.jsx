@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { useImperativeHandle, useState } from "react";
 import Mention from "@tiptap/extension-mention";
 import { ReactRenderer } from "@tiptap/react";
 
@@ -62,10 +62,13 @@ export const OpMention = Mention.extend({
   },
 });
 
-const MentionList = forwardRef(function MentionList({ items, command }, ref) {
+function MentionList({ items, command, ref }) {
   const [active, setActive] = useState(0);
-
-  useEffect(() => setActive(0), [items]);
+  const [prevItems, setPrevItems] = useState(items);
+  if (items !== prevItems) {
+    setPrevItems(items);
+    setActive(0);
+  }
 
   const select = (i) => {
     const it = items?.[i];
@@ -127,7 +130,7 @@ const MentionList = forwardRef(function MentionList({ items, command }, ref) {
       ))}
     </ul>
   );
-});
+}
 
 // Suggestion config factory — `getUsers` is called every keystroke and must
 // return the freshest list. Passing a getter (rather than a snapshot array)

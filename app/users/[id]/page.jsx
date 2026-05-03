@@ -7,6 +7,7 @@ import { CenterLoader, CenterError } from "@/components/ui/center-status";
 import { Icon } from "@/components/icons";
 import { useUser } from "@/lib/hooks/use-openproject";
 import { friendlyError } from "@/lib/api-client";
+import { usePublicConfig } from "@/components/config-provider";
 
 // Profile page that `<mention>` links resolve to. OpenProject serialises
 // mentions as `<a href="/users/<id>">@Name</a>` in stored comment HTML;
@@ -22,6 +23,7 @@ const FIELD_VALUE = "flex-1 text-[13.5px] text-fg leading-relaxed min-w-0 break-
 export default function UserProfilePage({ params }) {
   const { id } = use(params);
   const userQ = useUser(id);
+  const { openprojectUrl } = usePublicConfig();
 
   if (userQ.isLoading) return <CenterLoader label="Loading user…" />;
   if (userQ.isError) {
@@ -42,8 +44,7 @@ export default function UserProfilePage({ params }) {
     );
   }
 
-  const opUrl = process.env.NEXT_PUBLIC_OPENPROJECT_URL || "";
-  const opProfileHref = opUrl ? `${opUrl}/users/${u.id}` : null;
+  const opProfileHref = openprojectUrl ? `${openprojectUrl}/users/${u.id}` : null;
 
   return (
     <div className="min-h-screen bg-surface-app">

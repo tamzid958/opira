@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
 import { cn, findById, formatRelDate } from "@/lib/utils";
@@ -47,6 +47,7 @@ import {
   useWpRevisions,
   useWpSchema,
 } from "@/lib/hooks/use-openproject-detail";
+import { usePublicConfig } from "@/components/config-provider";
 
 // Reusable Tailwind class strings — keep the JSX readable.
 const FIELD_BTN =
@@ -252,10 +253,10 @@ export function TaskDetail({
   const subtaskRef = useRef(null);
   const attachmentsRef = useRef(null);
 
-  const { control, handleSubmit, reset, watch } = useForm({
+  const { control, handleSubmit, reset } = useForm({
     defaultValues: { comment: "" },
   });
-  const commentText = watch("comment") || "";
+  const commentText = useWatch({ control, name: "comment" }) || "";
 
   const activities = useActivities(wpId);
   // Counts fetched here drive the Development tab labels; TanStack dedupes
@@ -279,13 +280,12 @@ export function TaskDetail({
   };
   const schemaQ = useWpSchema(task?.schemaHref || null);
 
-  // Story points field — set NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD
-  // to either the native numeric `storyPoints` or a custom-field key
-  // like `customField7` for t-shirt sizing.
-  const spField =
-    schemaQ.data?.fields?.[
-      process.env.NEXT_PUBLIC_OPENPROJECT_STORY_POINTS_FIELD || "storyPoints"
-    ];
+  // Story points field — set OPENPROJECT_STORY_POINTS_FIELD to either the
+  // native numeric `storyPoints` or a custom-field key like `customField7`
+  // for t-shirt sizing. Read from runtime config so the same build works
+  // across environments.
+  const { storyPointsField } = usePublicConfig();
+  const spField = schemaQ.data?.fields?.[storyPointsField];
   const spIsCustomOption = spField?.type === "CustomOption";
   const spOptionsQ = useCustomOptions(spField?.allowedValuesHref, !!spField?.allowedValuesHref);
   // Some OP installs don't expose `allowedValues` via the schema link; the
@@ -300,11 +300,12 @@ export function TaskDetail({
   const mentionUsersQ = useAvailableAssignees(projectId, !!projectId);
   const mentionUsers = mentionUsersQ.data || [];
 
-  useEffect(() => {
-    if (!task) return;
+  const [prevTaskId, setPrevTaskId] = useState(task?.id);
+  if (task && task.id !== prevTaskId) {
+    setPrevTaskId(task.id);
     setTitleVal(task.title);
     setDescVal(task.descriptionHtml || task.description || "");
-  }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   if (!task) return null;
 

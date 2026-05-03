@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/icons";
 import { LoadingPill } from "@/components/ui/loading-pill";
@@ -84,7 +84,7 @@ export function NotificationBell({ onOpenWp }) {
   const data = q.data || { items: [], unread: 0 };
   const unread = data.unread;
 
-  const reasonSet = useMemo(() => new Set(reasons), [reasons]);
+  const reasonSet = new Set(reasons);
   const isFiltered = reasons.length > 0;
 
   const toggleReason = (value) => {

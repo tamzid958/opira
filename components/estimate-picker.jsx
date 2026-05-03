@@ -4,6 +4,8 @@ import { useState } from "react";
 import { TShirtPicker } from "@/components/tshirt-picker";
 import { Icon } from "@/components/icons";
 import { workingDaysBetween } from "@/lib/openproject/estimate";
+import { workingDaySet } from "@/lib/openproject/working-days";
+import { usePublicConfig } from "@/components/config-provider";
 
 // EstimatePicker — single editor for all three estimation modes.
 //
@@ -89,7 +91,9 @@ export function EstimatePicker({
 function DateRangeEstimate({ startDate, dueDate, disabled, onChange }) {
   const [s, setS] = useState(startDate || "");
   const [d, setD] = useState(dueDate || "");
-  const days = workingDaysBetween(s || null, d || null);
+  const { workingDays } = usePublicConfig();
+  const mask = workingDaySet(workingDays);
+  const days = workingDaysBetween(s || null, d || null, mask);
 
   const fire = (next) => {
     setS(next.start);

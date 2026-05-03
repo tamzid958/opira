@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { notFound, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Topbar } from "@/components/topbar";
@@ -93,26 +93,21 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
     }
   }, [projectId]);
 
-  const project = useMemo(
-    () => projectsQ.data?.find((p) => p.id === projectId) || null,
-    [projectsQ.data, projectId],
-  );
-  const sprintsList = useMemo(() => sprintsQ.data || [], [sprintsQ.data]);
-  const tasks = useMemo(() => tasksQ.data || [], [tasksQ.data]);
+  const project = projectsQ.data?.find((p) => p.id === projectId) || null;
+  const sprintsList = sprintsQ.data || [];
+  const tasks = tasksQ.data || [];
   // Epics surface from the OpenProject hierarchy: any work package that
   // has children and isn't itself a child. Type names play no role.
-  const epicsList = useMemo(() => {
-    return tasks
-      .filter((t) => t.hasChildren && !t.epic)
-      .map((t) => ({
-        id: String(t.nativeId),
-        nativeId: String(t.nativeId),
-        key: t.key,
-        title: t.title,
-        name: t.title,
-        color: "var(--accent)",
-      }));
-  }, [tasks]);
+  const epicsList = tasks
+    .filter((t) => t.hasChildren && !t.epic)
+    .map((t) => ({
+      id: String(t.nativeId),
+      nativeId: String(t.nativeId),
+      key: t.key,
+      title: t.title,
+      name: t.title,
+      color: "var(--accent)",
+    }));
   const currentUser = me.data?.user || null;
 
   const updateTask = (id, patch) =>

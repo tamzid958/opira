@@ -1,6 +1,6 @@
 {
   "name": "opira",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Opira — a modern, opinionated UI for OpenProject. Sprint board, backlog, timeline, reports and more, served from a Next.js App Router app over the OpenProject OAuth + v3 API.",
   "private": true,
   "license": "MIT",
@@ -33,7 +33,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -82,8 +82,10 @@
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9.39.0",
     "eslint-config-next": "16.2.4",
+    "eslint-plugin-react-compiler": "^19.1.0-rc.2",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.2.4"
   }

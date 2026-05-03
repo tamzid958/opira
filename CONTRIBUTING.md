@@ -23,7 +23,7 @@ git clone https://github.com/<your-fork>/openproject-jira-theme.git opira
 cd opira
 npm install
 cp .env.local.example .env.local
-# fill in NEXT_PUBLIC_OPENPROJECT_URL, OAuth client id/secret, AUTH_SECRET
+# fill in OPENPROJECT_URL, OAuth client id/secret, AUTH_SECRET
 npm run dev
 ```
 

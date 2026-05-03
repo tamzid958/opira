@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use } from "react";
 import { Reports } from "@/components/reports";
 import { Icon } from "@/components/icons";
 import { LoadingPill } from "@/components/ui/loading-pill";
@@ -25,14 +25,14 @@ export default function ReportsPage({ params: paramsPromise }) {
   const sprintsQ = useSprints(projectId, configured && !!projectId);
   const tasksQ = useTasks(projectId, null, configured && !!projectId);
 
-  const sprintsList = useMemo(() => sprintsQ.data || [], [sprintsQ.data]);
-  const activeSprint = useMemo(() => {
+  const sprintsList = sprintsQ.data || [];
+  const activeSprint = (() => {
     if (sprintFilter && sprintFilter !== "all") {
       const match = sprintsList.find((s) => s.id === sprintFilter);
       if (match) return match;
     }
     return pickSprintByDate(sprintsList);
-  }, [sprintsList, sprintFilter]);
+  })();
 
   const allTasks = tasksQ.data || [];
 

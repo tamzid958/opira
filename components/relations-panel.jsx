@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
 import { Icon } from "@/components/icons";
@@ -65,17 +65,13 @@ export function RelationsPanel({
   const create = useCreateRelation(wpId);
   const remove = useDeleteRelation(wpId);
 
-  const relations = useMemo(() => relationsQ.data || [], [relationsQ.data]);
-  const sorted = useMemo(
-    () =>
-      [...relations].sort((a, b) => {
-        const va = verbWeight(a.verb);
-        const vb = verbWeight(b.verb);
-        if (va !== vb) return va - vb;
-        return String(a.otherTitle || "").localeCompare(String(b.otherTitle || ""));
-      }),
-    [relations],
-  );
+  const relations = relationsQ.data || [];
+  const sorted = [...relations].sort((a, b) => {
+    const va = verbWeight(a.verb);
+    const vb = verbWeight(b.verb);
+    if (va !== vb) return va - vb;
+    return String(a.otherTitle || "").localeCompare(String(b.otherTitle || ""));
+  });
 
   // Inline add-row state. We never block the user behind a confirm button —
   // the WP pick *is* the commit, since nothing else is required.
@@ -86,31 +82,29 @@ export function RelationsPanel({
   const [typeMenu, setTypeMenu] = useState(null);
   const [targetMenu, setTargetMenu] = useState(null);
 
-  const relatedNativeIds = useMemo(
-    () => new Set(relations.map((r) => String(r.otherId)).filter(Boolean)),
-    [relations],
+  const relatedNativeIds = new Set(
+    relations.map((r) => String(r.otherId)).filter(Boolean),
   );
-  const targetItems = useMemo(() => {
-    const list = (allTasks || []).filter(
+  const targetItems = (allTasks || [])
+    .filter(
       (t) =>
         t &&
         t.id !== selfTaskId &&
         t.nativeId != null &&
         !relatedNativeIds.has(String(t.nativeId)),
-    );
-    return list.map((t) => ({
+    )
+    .map((t) => ({
       label: `${t.key} · ${t.title}`,
       value: String(t.nativeId),
     }));
-  }, [allTasks, selfTaskId, relatedNativeIds]);
 
-  const tasksByNative = useMemo(() => {
+  const tasksByNative = (() => {
     const m = new Map();
     for (const t of allTasks || []) {
       if (t?.nativeId != null) m.set(String(t.nativeId), t);
     }
     return m;
-  }, [allTasks]);
+  })();
 
   const startAdd = () => {
     setAdding(true);

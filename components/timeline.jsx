@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   addDays,
   addMonths,
@@ -394,16 +394,10 @@ export function Timeline({ tasks = [], sprints = [], assignees = [], onTaskClick
   const [showUndated, setShowUndated] = useState(false);
   const scrollRef = useRef(null);
 
-  const dated = useMemo(
-    () => tasks.filter((t) => t.startDate && t.dueDate),
-    [tasks],
-  );
-  const undated = useMemo(
-    () => tasks.filter((t) => !t.startDate || !t.dueDate),
-    [tasks],
-  );
+  const dated = tasks.filter((t) => t.startDate && t.dueDate);
+  const undated = tasks.filter((t) => !t.startDate || !t.dueDate);
 
-  const { rangeStart, rangeEnd } = useMemo(() => {
+  const { rangeStart, rangeEnd } = (() => {
     const dates = [];
     for (const t of dated) {
       const s = safeISO(t.startDate);
@@ -425,13 +419,10 @@ export function Timeline({ tasks = [], sprints = [], assignees = [], onTaskClick
       rangeStart: addDays(dateMin(dates), -3),
       rangeEnd: addDays(dateMax(dates), 3),
     };
-  }, [dated, sprints]);
+  })();
 
   const dayPx = ZOOM[zoom].day;
-  const axis = useMemo(
-    () => buildAxis(rangeStart, rangeEnd, dayPx),
-    [rangeStart, rangeEnd, dayPx],
-  );
+  const axis = buildAxis(rangeStart, rangeEnd, dayPx);
   const totalWidth = axis.totalDays * dayPx;
 
   const today = new Date();
@@ -440,10 +431,7 @@ export function Timeline({ tasks = [], sprints = [], assignees = [], onTaskClick
       ? differenceInCalendarDays(today, rangeStart) * dayPx
       : null;
 
-  const groups = useMemo(
-    () => groupTasks(dated, groupBy, { sprints, assignees }),
-    [dated, groupBy, sprints, assignees],
-  );
+  const groups = groupTasks(dated, groupBy, { sprints, assignees });
 
   const isOpen = (g) => {
     if (openOverrides.has(g.key)) return openOverrides.get(g.key);

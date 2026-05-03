@@ -33,7 +33,7 @@ const MEMBER_FETCH_CAP = 50;
 const DEFAULT_HOURS_PER_DAY = 8;
 
 function hoursPerPoint() {
-  const raw = Number(process.env.NEXT_PUBLIC_HOURS_PER_POINT);
+  const raw = Number(process.env.HOURS_PER_POINT);
   return Number.isFinite(raw) && raw > 0 ? raw : 4;
 }
 
@@ -125,7 +125,7 @@ async function computeCapacity(projectId, sprintId) {
   }
 
   // Walk sprint days, summing per-member available hours.
-  const wdays = workingDaySet();
+  const wdays = workingDaySet(process.env.OPENPROJECT_WORKING_DAYS);
   const members = memberData.map((m) => {
     let availableHours = 0;
     let availableDays = 0;

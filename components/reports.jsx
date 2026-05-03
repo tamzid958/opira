@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { Avatar } from "@/components/ui/avatar";
 import { LoadingPill } from "@/components/ui/loading-pill";
@@ -12,6 +12,7 @@ import { useBurndown, useVelocity } from "@/lib/hooks/use-openproject-detail";
 import { workingDaySet } from "@/lib/openproject/working-days";
 import { formatEstimate, weightOf } from "@/lib/openproject/estimate";
 import { safeParseISO } from "@/lib/utils";
+import { usePublicConfig } from "@/components/config-provider";
 
 const PAGE_SIZE_DEFAULT = 10;
 
@@ -40,8 +41,8 @@ function BestEffort({ children = "Reconstructed from OpenProject activity histor
 // a working day under the configured mask. Returns parallel arrays for
 // indices, days, and a running working-day count so the chart math can
 // step the ideal line.
-function buildSprintCalendar(startIso, endIso) {
-  const wd = workingDaySet();
+function buildSprintCalendar(startIso, endIso, workingDaysRaw) {
+  const wd = workingDaySet(workingDaysRaw);
   const out = [];
   if (!startIso || !endIso || startIso === "—" || endIso === "—") {
     return { days: out, totalWorkingDays: 0 };
@@ -216,10 +217,8 @@ function Donut({ segments, size = 168, thickness = 22, centerLabel, centerSub })
 
 function Burndown({ projectId, sprint }) {
   const q = useBurndown(projectId, sprint?.id, !!projectId && !!sprint?.id);
-  const calendar = useMemo(
-    () => buildSprintCalendar(sprint?.start, sprint?.end),
-    [sprint?.start, sprint?.end],
-  );
+  const { workingDays } = usePublicConfig();
+  const calendar = buildSprintCalendar(sprint?.start, sprint?.end, workingDays);
 
   if (q.isLoading) {
     return (
@@ -543,13 +542,9 @@ function Burndown({ projectId, sprint }) {
 
 function SprintReport({ projectId, sprint, sprintTasks, mode = "numeric" }) {
   const q = useBurndown(projectId, sprint?.id, !!projectId && !!sprint?.id);
-  const completedPts = useMemo(
-    () =>
-      sprintTasks
-        .filter((t) => t.statusIsClosed)
-        .reduce((s, t) => s + weightOf(t, { mode }), 0),
-    [sprintTasks, mode],
-  );
+  const completedPts = sprintTasks
+    .filter((t) => t.statusIsClosed)
+    .reduce((s, t) => s + weightOf(t, { mode }), 0);
 
   if (q.isLoading) {
     return (
@@ -1022,7 +1017,7 @@ const UNASSIGNED_KEY = "__unassigned";
 
 function MemberContribution({ tasks, scopeLabel, unit = "pts", mode = "numeric" }) {
   const [visible, setVisible] = useState(PAGE_SIZE_DEFAULT);
-  const { rows, unassigned } = useMemo(() => {
+  const { rows, unassigned } = (() => {
     const byAssignee = new Map();
     const un = {
       id: UNASSIGNED_KEY,
@@ -1068,7 +1063,7 @@ function MemberContribution({ tasks, scopeLabel, unit = "pts", mode = "numeric" 
       (a, b) => b.completed - a.completed || b.committed - a.committed,
     );
     return { rows: sorted, unassigned: un.committedCount > 0 ? un : null };
-  }, [tasks, mode]);
+  })();
 
   const allRows = unassigned ? [...rows, unassigned] : rows;
   const totalCommitted = allRows.reduce((s, r) => s + r.committed, 0);
@@ -1195,7 +1190,7 @@ function StatusDistribution({ tasks, scopeLabel }) {
   // Build one segment per OpenProject status that's actually used in the
   // visible tasks. Color comes from `task.statusColor` (API truth) — when
   // OP doesn't set a colour we fall back to a closed-vs-open neutral.
-  const segments = useMemo(() => {
+  const segments = (() => {
     const acc = new Map();
     for (const t of tasks) {
       const id = t.statusId ? String(t.statusId) : "none";
@@ -1215,7 +1210,7 @@ function StatusDistribution({ tasks, scopeLabel }) {
       if (a.isClosed !== b.isClosed) return a.isClosed ? 1 : -1;
       return a.label.localeCompare(b.label);
     });
-  }, [tasks]);
+  })();
   const total = segments.reduce((s, x) => s + x.value, 0);
   const done = segments
     .filter((s) => s.isClosed)
@@ -1262,7 +1257,7 @@ function StatusDistribution({ tasks, scopeLabel }) {
 function TypeBreakdown({ tasks }) {
   // One bar per type ID actually present in the tasks list. Color is the
   // type's API-configured colour; "done" counts use `statusIsClosed`.
-  const rows = useMemo(() => {
+  const rows = (() => {
     const acc = new Map();
     for (const t of tasks) {
       const key = t.typeId ? String(t.typeId) : "none";
@@ -1280,7 +1275,7 @@ function TypeBreakdown({ tasks }) {
       acc.set(key, ent);
     }
     return [...acc.values()].sort((a, b) => b.total - a.total || a.label.localeCompare(b.label));
-  }, [tasks]);
+  })();
   const max = Math.max(1, ...rows.map((r) => r.total));
   const totalIssues = rows.reduce((s, r) => s + r.total, 0);
 
@@ -1334,7 +1329,7 @@ function TypeBreakdown({ tasks }) {
 // Top-level KPI row — five tiles the PM scans before anything else.
 
 function KpiRow({ sprint, sprintTasks, allTasks, velocity, unit = "pts", mode = "numeric" }) {
-  const sprintProgress = useMemo(() => {
+  const sprintProgress = (() => {
     const wOpts = { mode };
     const totalPts = sprintTasks.reduce((s, t) => s + weightOf(t, wOpts), 0);
     const donePts = sprintTasks
@@ -1345,14 +1340,12 @@ function KpiRow({ sprint, sprintTasks, allTasks, velocity, unit = "pts", mode = 
       donePts,
       totalPts,
     };
-  }, [sprintTasks, mode]);
+  })();
 
   // Cycle time: avg days from createdAt → updatedAt across done tasks
   // updated in the last 60 days. Coarse but honest — OP doesn't expose
   // a "started at" timestamp without parsing every WP's activity log.
-  const cycleTime = useMemo(() => {
-    // Moving 60-day window evaluated at compute time; memo is keyed on
-    // `allTasks` so it only recomputes when data actually changes.
+  const cycleTime = (() => {
     // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const cutoff = now - 60 * 24 * 60 * 60 * 1000;
@@ -1369,22 +1362,21 @@ function KpiRow({ sprint, sprintTasks, allTasks, velocity, unit = "pts", mode = 
     if (samples.length === 0) return null;
     const avg = samples.reduce((s, x) => s + x, 0) / samples.length;
     return { avg, n: samples.length };
-  }, [allTasks]);
+  })();
 
   // On-time delivery: % of recent closed sprints whose completed >= committed.
-  const onTime = useMemo(() => {
+  const onTime = (() => {
     const sprints = velocity?.sprints || [];
     if (sprints.length === 0) return null;
     const considered = sprints.filter((s) => s.committed > 0);
     if (considered.length === 0) return null;
     const ok = considered.filter((s) => s.completed >= s.committed).length;
     return { pct: Math.round((ok / considered.length) * 100), n: considered.length };
-  }, [velocity]);
+  })();
 
   // Active contributors: distinct assignees who closed something in the
   // last 14 days.
-  const active = useMemo(() => {
-    // Moving 14-day window; memo recomputes only when allTasks changes.
+  const active = (() => {
     // eslint-disable-next-line react-hooks/purity
     const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
     const ids = new Set();
@@ -1394,7 +1386,7 @@ function KpiRow({ sprint, sprintTasks, allTasks, velocity, unit = "pts", mode = 
       if (updated && updated.getTime() >= cutoff) ids.add(String(t.assignee));
     }
     return ids.size;
-  }, [allTasks]);
+  })();
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -1442,10 +1434,7 @@ function KpiRow({ sprint, sprintTasks, allTasks, velocity, unit = "pts", mode = 
 // slice internally for the burndown / sprint-progress KPI.
 
 export function Reports({ sprint, projectId, tasks = [] }) {
-  const sprintTasks = useMemo(
-    () => (sprint ? tasks.filter((t) => t.sprint === sprint.id) : []),
-    [tasks, sprint],
-  );
+  const sprintTasks = sprint ? tasks.filter((t) => t.sprint === sprint.id) : [];
   const velocityQ = useVelocity(projectId, !!projectId);
   const velocity = velocityQ.data || { sprints: [], avg: 0 };
   // Project-wide mode + unit come from the velocity response (schema-

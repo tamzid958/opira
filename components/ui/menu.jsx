@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/icons";
 import { Avatar } from "@/components/ui/avatar";
@@ -41,14 +41,14 @@ export function Menu({
   // Apply free-text filter when searchable. Dividers/section headers are
   // dropped while filtering so the result reads as a flat hit list.
   // Must be declared before any early return so hook order stays stable.
-  const visibleItems = useMemo(() => {
+  const visibleItems = (() => {
     if (!searchable || !query.trim()) return items;
     const q = query.trim().toLowerCase();
     return items.filter((it) => {
       if (it.divider || it.section) return false;
       return String(it.label || "").toLowerCase().includes(q);
     });
-  }, [items, query, searchable]);
+  })();
 
   if (!mounted) return null;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
 import { Icon } from "@/components/icons";
@@ -33,10 +33,7 @@ export function CompleteSprintModal({
   const createVersion = useCreateVersion(projectId);
   const [busy, setBusy] = useState(false);
 
-  const closedStatusIds = useMemo(
-    () => buildClosedStatusIdSet(statuses),
-    [statuses],
-  );
+  const closedStatusIds = buildClosedStatusIdSet(statuses);
 
   const inSprint = tasks.filter((t) => t.sprint === sprint.id);
   const open = inSprint.filter(
@@ -49,10 +46,7 @@ export function CompleteSprintModal({
       (s.name || "").trim().toLowerCase() !== "backlog",
   );
 
-  const totalPoints = useMemo(
-    () => open.reduce((sum, t) => sum + weightOf(t), 0),
-    [open],
-  );
+  const totalPoints = open.reduce((sum, t) => sum + weightOf(t), 0);
 
   const pageCount = Math.max(1, Math.ceil(open.length / TICKETS_PER_PAGE));
   const safePage = Math.min(page, pageCount - 1);

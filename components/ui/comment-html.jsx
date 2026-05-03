@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import DOMPurify from "isomorphic-dompurify";
 import parse, { attributesToProps, domToReact } from "html-react-parser";
 
@@ -118,11 +117,8 @@ const replace = (node) => {
 };
 
 export function CommentHtml({ html, className }) {
-  const tree = useMemo(() => {
-    if (!html) return null;
-    const clean = DOMPurify.sanitize(html, PURIFY_CONFIG);
-    return parse(clean, { replace });
-  }, [html]);
-  if (!tree) return null;
+  if (!html) return null;
+  const clean = DOMPurify.sanitize(html, PURIFY_CONFIG);
+  const tree = parse(clean, { replace });
   return <div className={className}>{tree}</div>;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -337,9 +337,9 @@ export function BoardSwimlanes({
   // mirrors the hierarchy. Anything that's neither a section
   // header nor a card in some section's body collects into a
   // trailing "Other Issues" section.
-  const childIndex = useMemo(() => buildChildIndex(tasks, { sort: false }), [tasks]);
+  const childIndex = buildChildIndex(tasks, { sort: false });
 
-  const { groups, otherCards } = useMemo(() => {
+  const { groups, otherCards } = (() => {
     const result = [];
     const seenHeader = new Set();
 
@@ -365,7 +365,7 @@ export function BoardSwimlanes({
     );
 
     return { groups: result, otherCards: other };
-  }, [tasks, childIndex]);
+  })();
 
   const [collapsed, setCollapsed] = useState(() => new Set());
   const toggle = (key) =>
@@ -378,10 +378,7 @@ export function BoardSwimlanes({
   const [activeId, setActiveId] = useState(null);
   const [overId, setOverId] = useState(null);
 
-  const activeTask = useMemo(
-    () => (activeId ? tasks.find((t) => t.id === activeId) : null),
-    [activeId, tasks],
-  );
+  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
   const handleDragEnd = (e) => {
     setActiveId(null);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
@@ -46,7 +46,7 @@ export function TimeEntriesPanel({ wpId, currentUserId, canLog = true }) {
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -57,7 +57,7 @@ export function TimeEntriesPanel({ wpId, currentUserId, canLog = true }) {
       activityId: "",
     },
   });
-  const spentOn = watch("spentOn");
+  const spentOn = useWatch({ control, name: "spentOn" });
 
   const onSubmit = async (values) => {
     try {

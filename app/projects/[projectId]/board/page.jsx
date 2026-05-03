@@ -44,16 +44,13 @@ export default function BoardPage({ params: paramsPromise }) {
   const view =
     viewParam === "list" || viewParam === "swimlanes" ? viewParam : "kanban";
 
-  const filters = useMemo(
-    () => ({
-      q: urlParams.get("q") || "",
-      assignee: urlParams.get("assignee") || "all",
-      type: urlParams.get("type") || "all",
-      label: urlParams.get("label") || "all",
-      status: urlParams.get("status") || "all",
-    }),
-    [urlParams],
-  );
+  const filters = {
+    q: urlParams.get("q") || "",
+    assignee: urlParams.get("assignee") || "all",
+    type: urlParams.get("type") || "all",
+    label: urlParams.get("label") || "all",
+    status: urlParams.get("status") || "all",
+  };
   const setFilter = (k, v) => setParams({ [k]: v && v !== "all" ? v : null });
 
   // "Updated since" overlay — when on, every card updated after this
@@ -123,7 +120,7 @@ export default function BoardPage({ params: paramsPromise }) {
   // "My work" needs the current user id; we hide it until /me resolves.
   // "Standup" sets the same `since=24h` URL param the toolbar toggle uses
   // so it round-trips with the existing overlay logic.
-  const presetViews = useMemo(() => {
+  const presetViews = (() => {
     const list = [];
     if (myUserId) {
       list.push({
@@ -140,7 +137,7 @@ export default function BoardPage({ params: paramsPromise }) {
       preset: true,
     });
     return list;
-  }, [myUserId]);
+  })();
   const sprintsQ = useSprints(projectId, configured && !!projectId);
   const statusesQ = useStatuses(configured);
   const typesQ = useTypes(projectId, configured && !!projectId);
@@ -242,7 +239,7 @@ export default function BoardPage({ params: paramsPromise }) {
   const sprintScope =
     sprintFilter === "all" ? null : sprintFilter === "backlog" ? "backlog" : sprintFilter;
   const tasksQ = useTasks(projectId, sprintScope, configured && !!projectId);
-  const tasks = useMemo(() => tasksQ.data || [], [tasksQ.data]);
+  const tasks = tasksQ.data || [];
 
   // Gate the page body on EVERY query the page reads — filter chips, sprint
   // selector, and the board itself all derive labels from these. Rendering
@@ -260,29 +257,25 @@ export default function BoardPage({ params: paramsPromise }) {
 
   // Apply chip + search filters client-side. The sprint filter is already
   // applied server-side via `?sprint=`; everything else is local.
-  const filteredTasks = useMemo(
-    () =>
-      tasks.filter((t) => {
-        if (filters.assignee !== "all" && t.assignee !== filters.assignee) return false;
-        if (filters.type !== "all" && String(t.typeId) !== String(filters.type)) return false;
-        if (filters.label !== "all" && !(t.labels || []).includes(filters.label)) return false;
-        if (filters.status !== "all" && String(t.statusId) !== String(filters.status)) return false;
-        if (filters.q) {
-          const q = filters.q.toLowerCase();
-          if (!t.title.toLowerCase().includes(q) && !t.key.toLowerCase().includes(q)) return false;
-        }
-        return true;
-      }),
-    [tasks, filters],
-  );
+  const filteredTasks = tasks.filter((t) => {
+    if (filters.assignee !== "all" && t.assignee !== filters.assignee) return false;
+    if (filters.type !== "all" && String(t.typeId) !== String(filters.type)) return false;
+    if (filters.label !== "all" && !(t.labels || []).includes(filters.label)) return false;
+    if (filters.status !== "all" && String(t.statusId) !== String(filters.status)) return false;
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      if (!t.title.toLowerCase().includes(q) && !t.key.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
 
-  const activeSprint = useMemo(() => {
+  const activeSprint = (() => {
     if (sprintFilter && sprintFilter !== "all" && sprintFilter !== "backlog") {
       const match = sprintsList.find((s) => s.id === sprintFilter);
       if (match) return match;
     }
     return pickSprintByDate(sprintsList);
-  }, [sprintsList, sprintFilter]);
+  })();
 
   const [sprintMenu, setSprintMenu] = useState(null);
   const [filterMenu, setFilterMenu] = useState(null);
@@ -461,14 +454,11 @@ export default function BoardPage({ params: paramsPromise }) {
   // assignee as swimlane rows). Redundant kinds are hidden from the
   // "+ Filter" picker but still rendered as chips when they happen to be
   // set, so switching view doesn't silently drop existing filters.
-  const RELEVANT_FILTER_KINDS_BY_VIEW = useMemo(
-    () => ({
-      kanban: ["assignee", "type", "label"],
-      swimlanes: ["type", "label", "status"],
-      list: ["assignee", "type", "label", "status"],
-    }),
-    [],
-  );
+  const RELEVANT_FILTER_KINDS_BY_VIEW = {
+    kanban: ["assignee", "type", "label"],
+    swimlanes: ["type", "label", "status"],
+    list: ["assignee", "type", "label", "status"],
+  };
 
   const chipMeta = (kind) => {
     switch (kind) {

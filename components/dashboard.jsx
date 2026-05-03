@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   addDays,
   differenceInCalendarDays,
@@ -291,7 +291,7 @@ export function Dashboard({
 }) {
   const myId = currentUser?.id;
   const firstName = currentUser?.name?.split(" ")[0] || "there";
-  const today = useMemo(() => new Date(), []);
+  const today = new Date();
   // Schema-anchored estimation mode. Drives weightOf on every assignee
   // tally + my-open-work sum, plus the unit suffix on the chrome so a
   // t-shirt project doesn't read "27 d" or sum stray date weights into
@@ -307,15 +307,12 @@ export function Dashboard({
   const [topPage, setTopPage] = useState(0);
 
   // Slices — three numbers + one focus list + a top-assignees roll-up.
-  const openTasks = useMemo(() => tasks.filter((t) => !t.statusIsClosed), [tasks]);
-  const myOpen = useMemo(
-    () => (myId ? openTasks.filter((t) => t.assignee === myId) : []),
-    [openTasks, myId],
-  );
+  const openTasks = tasks.filter((t) => !t.statusIsClosed);
+  const myOpen = myId ? openTasks.filter((t) => t.assignee === myId) : [];
 
   // Every assignee with open work, sorted by leaders first. Paginated in
   // the render below so the rail stays compact regardless of team size.
-  const topAssignees = useMemo(() => {
+  const topAssignees = (() => {
     const tally = new Map();
     for (const t of openTasks) {
       if (!t.assignee) continue;
@@ -330,7 +327,7 @@ export function Dashboard({
       tally.set(t.assignee, ent);
     }
     return [...tally.values()].sort((a, b) => b.count - a.count);
-  }, [openTasks, mode]);
+  })();
   // Drive the bar by story points when at least one assignee has any
   // estimate; otherwise fall back to open-issue count so the section
   // still says something visually on a project that hasn't sized work
@@ -354,7 +351,7 @@ export function Dashboard({
     topAssignees.length,
   );
 
-  const { dueToday, overdue, focus } = useMemo(() => {
+  const { dueToday, overdue, focus } = (() => {
     const dt = [];
     const od = [];
     for (const t of tasks) {
@@ -378,10 +375,10 @@ export function Dashboard({
       ...dt.map((x) => ({ ...x, group: "today" })),
     ].slice(0, 8);
     return { dueToday: dt, overdue: od, focus: fcs };
-  }, [tasks, today]);
+  })();
 
   // Sprint context for the hero eyebrow.
-  const sprintInfo = useMemo(() => {
+  const sprintInfo = (() => {
     if (!activeSprint) return null;
     const start = safeISO(activeSprint.start);
     const end = safeISO(activeSprint.end);
@@ -401,12 +398,12 @@ export function Dashboard({
       totalDays,
       endsIn,
     };
-  }, [activeSprint, today]);
+  })();
 
   // Sprint roadmap — annotate each sprint with its task counts so the
   // Cadence rail can render a one-line progress bar without re-running
   // the slicing logic for every card. Paginated in the render below.
-  const cadence = useMemo(() => {
+  const cadence = (() => {
     const rank = (s) =>
       s.state === "active" ? 0 : s.state === "planned" ? 1 : 2;
     return [...sprints]
@@ -419,7 +416,7 @@ export function Dashboard({
         if (rank(a) !== rank(b)) return rank(a) - rank(b);
         return (a.start || "").localeCompare(b.start || "");
       });
-  }, [sprints, tasks]);
+  })();
   const cadencePageCount = Math.max(
     1,
     Math.ceil(cadence.length / CADENCE_PAGE_SIZE),

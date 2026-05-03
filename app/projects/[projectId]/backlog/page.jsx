@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useState } from "react";
 import { toast } from "sonner";
 import { Backlog } from "@/components/backlog";
 import { CreateSprintModal } from "@/components/create-sprint";
@@ -60,21 +60,18 @@ const DEFAULT_FILTERS = {
 export default function BacklogPage({ params: paramsPromise }) {
   const { projectId } = use(paramsPromise);
   const { params: urlParams, setParams } = useUrlParams();
-  const filters = useMemo(
-    () => ({
-      q: urlParams.get("q") || "",
-      epic: urlParams.get("epic") || "all",
-      type: urlParams.get("type") || "all",
-      label: urlParams.get("label") || "all",
-      sprint: urlParams.get("sprint") || "all",
-      assignee: urlParams.get("assignee") || "all",
-      // `where` carries virtual presets that don't map to a single field
-      // (e.g. "unestimated", "noEpic", "mineOpen"). The row predicate
-      // below interprets it; the Views menu sets / clears it.
-      where: urlParams.get("where") || null,
-    }),
-    [urlParams],
-  );
+  const filters = {
+    q: urlParams.get("q") || "",
+    epic: urlParams.get("epic") || "all",
+    type: urlParams.get("type") || "all",
+    label: urlParams.get("label") || "all",
+    sprint: urlParams.get("sprint") || "all",
+    assignee: urlParams.get("assignee") || "all",
+    // `where` carries virtual presets that don't map to a single field
+    // (e.g. "unestimated", "noEpic", "mineOpen"). The row predicate
+    // below interprets it; the Views menu sets / clears it.
+    where: urlParams.get("where") || null,
+  };
 
   const status = useApiStatus();
   const configured = status.data?.configured === true;
@@ -95,13 +92,10 @@ export default function BacklogPage({ params: paramsPromise }) {
   const updateVersionMutation = useUpdateVersion(projectId);
   const manageVersions = usePermissionWithLoading(projectId, PERM.MANAGE_VERSIONS);
 
-  const tasks = useMemo(() => tasksQ.data || [], [tasksQ.data]);
-  const sprintsList = useMemo(() => sprintsQ.data || [], [sprintsQ.data]);
-  const statuses = useMemo(() => statusesQ.data || [], [statusesQ.data]);
-  const closedStatusIds = useMemo(
-    () => buildClosedStatusIdSet(statuses),
-    [statuses],
-  );
+  const tasks = tasksQ.data || [];
+  const sprintsList = sprintsQ.data || [];
+  const statuses = statusesQ.data || [];
+  const closedStatusIds = buildClosedStatusIdSet(statuses);
 
   // Trailing velocity — average done-points across the last 3 closed
   // sprints, used to flag over-commitment on planned/active sprint
@@ -117,7 +111,7 @@ export default function BacklogPage({ params: paramsPromise }) {
     ? inferModeFromTasks(tasks) || "numeric"
     : estimateModeQ.mode || "numeric";
   const estimateUnit = unitFor(estimateMode);
-  const velocity = useMemo(() => {
+  const velocity = (() => {
     if (!sprintsList.length || !tasks.length) return null;
     const closed = sprintsList
       .filter((s) => s.status === "closed")
@@ -135,13 +129,11 @@ export default function BacklogPage({ params: paramsPromise }) {
     }
     if (totalDone <= 0) return null;
     return Math.round(totalDone / closed.length);
-  }, [sprintsList, tasks, estimateMode, closedStatusIds]);
+  })();
 
   // Sprints whose end date is in the past but are still open/locked. Surfaced
   // as a one-click "Complete sprint" / "Adjust dates" banner above the body.
-  const overdueSprints = useMemo(() => {
-    // Today + age are wall-clock-derived; the memo recomputes when the
-    // sprint list changes, which is good enough for a dismissable banner.
+  const overdueSprints = (() => {
     // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const todayIso = new Date(now).toISOString().slice(0, 10);
@@ -156,7 +148,7 @@ export default function BacklogPage({ params: paramsPromise }) {
       out.push({ ...s, endedDays });
     }
     return out;
-  }, [sprintsList]);
+  })();
 
   // Hold the page chrome until every query the body reads has settled. The
   // filter chips, sprint picker, and per-row pickers all derive labels
@@ -174,54 +166,46 @@ export default function BacklogPage({ params: paramsPromise }) {
   // An "epic" is a parent in the OpenProject hierarchy — derived from
   // `_links.children`, never from the type name. Top-level parents
   // (no parent of their own) are the canonical epic candidates.
-  const epicsList = useMemo(
-    () =>
-      tasks
-        .filter((t) => t.hasChildren && !t.epic)
-        .map((t) => ({
-          id: String(t.nativeId),
-          nativeId: String(t.nativeId),
-          key: t.key,
-          title: t.title,
-          name: t.title,
-          color: "var(--accent)",
-        })),
-    [tasks],
-  );
+  const epicsList = tasks
+    .filter((t) => t.hasChildren && !t.epic)
+    .map((t) => ({
+      id: String(t.nativeId),
+      nativeId: String(t.nativeId),
+      key: t.key,
+      title: t.title,
+      name: t.title,
+      color: "var(--accent)",
+    }));
   const myUserId = me.data?.user?.id || null;
-  const filteredTasks = useMemo(
-    () =>
-      tasks.filter((t) => {
-        if (filters.assignee !== "all" && t.assignee !== filters.assignee) return false;
-        if (filters.epic !== "all" && t.epic !== filters.epic) return false;
-        if (filters.type !== "all" && String(t.typeId) !== String(filters.type)) return false;
-        if (filters.label !== "all" && !(t.labels || []).includes(filters.label)) return false;
-        if (filters.sprint === "backlog" && t.sprint) return false;
-        if (filters.sprint !== "all" && filters.sprint !== "backlog" && t.sprint !== filters.sprint)
-          return false;
-        if (filters.q) {
-          const q = filters.q.toLowerCase();
-          if (!t.title.toLowerCase().includes(q) && !t.key.toLowerCase().includes(q)) return false;
-        }
-        // Virtual presets — applied last so they compose with the
-        // explicit filter dimensions above.
-        if (filters.where === "unestimated") {
-          // "Estimated" depends on the project's mode: a duration project
-          // counts a WP with start+due dates as estimated even without
-          // story points. weightOf with the project mode handles both.
-          if (weightOf(t, { mode: estimateMode }) > 0) return false;
-          if (closedStatusIds.has(String(t.statusId))) return false;
-        } else if (filters.where === "noEpic") {
-          if (t.epic) return false;
-          if (t.hasChildren) return false;
-        } else if (filters.where === "mineOpen") {
-          if (!myUserId || String(t.assignee) !== String(myUserId)) return false;
-          if (closedStatusIds.has(String(t.statusId))) return false;
-        }
-        return true;
-      }),
-    [tasks, filters, myUserId, estimateMode, closedStatusIds],
-  );
+  const filteredTasks = tasks.filter((t) => {
+    if (filters.assignee !== "all" && t.assignee !== filters.assignee) return false;
+    if (filters.epic !== "all" && t.epic !== filters.epic) return false;
+    if (filters.type !== "all" && String(t.typeId) !== String(filters.type)) return false;
+    if (filters.label !== "all" && !(t.labels || []).includes(filters.label)) return false;
+    if (filters.sprint === "backlog" && t.sprint) return false;
+    if (filters.sprint !== "all" && filters.sprint !== "backlog" && t.sprint !== filters.sprint)
+      return false;
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      if (!t.title.toLowerCase().includes(q) && !t.key.toLowerCase().includes(q)) return false;
+    }
+    // Virtual presets — applied last so they compose with the
+    // explicit filter dimensions above.
+    if (filters.where === "unestimated") {
+      // "Estimated" depends on the project's mode: a duration project
+      // counts a WP with start+due dates as estimated even without
+      // story points. weightOf with the project mode handles both.
+      if (weightOf(t, { mode: estimateMode }) > 0) return false;
+      if (closedStatusIds.has(String(t.statusId))) return false;
+    } else if (filters.where === "noEpic") {
+      if (t.epic) return false;
+      if (t.hasChildren) return false;
+    } else if (filters.where === "mineOpen") {
+      if (!myUserId || String(t.assignee) !== String(myUserId)) return false;
+      if (closedStatusIds.has(String(t.statusId))) return false;
+    }
+    return true;
+  });
 
   const setFilter = (k, v) => setParams({ [k]: v && v !== "all" ? v : null });
 

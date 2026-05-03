@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/icons";
 import { TaskTypeIcon } from "@/components/ui/task-meta";
@@ -29,7 +29,7 @@ export function CommandPalette({ open, onClose, onOpenWp, onSwitchProject }) {
     return () => clearTimeout(id);
   }, [open]);
 
-  const items = useMemo(() => {
+  const items = (() => {
     const d = search.data || {};
     const all = [];
     (d.projects || []).forEach((p) =>
@@ -54,7 +54,7 @@ export function CommandPalette({ open, onClose, onOpenWp, onSwitchProject }) {
       all.push({ kind: "user", id: u.id, label: u.name, sub: "person", user: u }),
     );
     return all;
-  }, [search.data]);
+  })();
 
   // Reset highlighted row whenever the query or result count changes.
   const [prevKey, setPrevKey] = useState(`${q}|${items.length}`);

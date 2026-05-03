@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -23,11 +23,11 @@ import { useQueryClient } from "@tanstack/react-query";
 export function RealtimeSync() {
   const qc = useQueryClient();
   const pathname = usePathname();
-  const projectId = useMemo(() => {
+  const projectId = (() => {
     if (!pathname) return null;
     const m = pathname.match(/^\/projects\/([^/]+)/);
     return m ? m[1] : null;
-  }, [pathname]);
+  })();
 
   const esRef = useRef(null);
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
@@ -37,11 +37,11 @@ export function CreateSprintModal({ onClose, onCreate, defaultName }) {
   const [submitting, setSubmitting] = useState(false);
   const [showGoal, setShowGoal] = useState(false);
 
-  const today = useMemo(() => new Date(), []);
+  const today = new Date();
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm({
@@ -56,13 +56,13 @@ export function CreateSprintModal({ onClose, onCreate, defaultName }) {
     },
   });
 
-  const start = watch("start");
-  const end = watch("end");
-  const goal = watch("goal");
+  const start = useWatch({ control, name: "start" });
+  const end = useWatch({ control, name: "end" });
+  const goal = useWatch({ control, name: "goal" });
 
   // Inline duration label so the user sees the planned length update as
   // they edit the dates — avoids a separate "Duration" field.
-  const duration = useMemo(() => {
+  const duration = (() => {
     try {
       if (!start || !end) return null;
       const days = differenceInCalendarDays(parseISO(end), parseISO(start)) + 1;
@@ -72,7 +72,7 @@ export function CreateSprintModal({ onClose, onCreate, defaultName }) {
     } catch {
       return null;
     }
-  }, [start, end]);
+  })();
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose?.();
