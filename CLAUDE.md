@@ -4,7 +4,13 @@ Guidance for Claude Code (and other AI agents) working in this repository.
 
 ## What this project is
 
-**Opira** — a Next.js front-end for [OpenProject](https://www.openproject.org/) styled like Jira. There is **no application database**: every screen is built from live OpenProject v3 API responses, every mutation is round-tripped to the user's OpenProject instance, and OpenProject's permission model is the access control model. Do not introduce a shadow database, ORM, or background workers — if you need data, it comes from OpenProject.
+**Opira** — a Next.js front-end for [OpenProject](https://www.openproject.org/) styled like Jira. Opira owns no application database: it talks to **OpenProject** as the source of truth via two modes selected by `OPIRA_DATA_SOURCE` (server-only):
+- `api` (default) — every read and write goes through the OP v3 HAL+JSON API.
+- `hybrid` (recommended once DB credentials are wired) — DB-direct reads + API-routed writes.
+
+Both modes go through the Repository layer in [lib/data/](lib/data/) and produce identical UI shapes; components don't change when the toggle flips. OpenProject's permission model is still the access-control model in every mode. Do not introduce a *shadow* database, ORM, or background workers — if you need data, it comes from OpenProject (API or its own DB).
+
+**Writes always go through the API in Phase 1.** Even in `hybrid` mode, mutations route through the API repository so OpenProject's journals, notifications, derived progress, and webhook events stay intact. Direct DB writes are explicitly Phase 2 (see [docs/data-layer.md](docs/data-layer.md)).
 
 ## Stack
 
@@ -57,6 +63,10 @@ Guidance for Claude Code (and other AI agents) working in this repository.
 | `OPENPROJECT_STORY_POINTS_FIELD` | optional | `storyPoints` (default) or `customFieldN`. Same server→client handoff as `OPENPROJECT_URL`. |
 | `OPENPROJECT_WORKING_DAYS` | optional | Comma/space-separated three-letter day prefixes for burndown / capacity (default Mon..Fri). |
 | `HOURS_PER_POINT` | optional | Numeric multiplier for the capacity calculation; server-only. |
+| `OPIRA_DATA_SOURCE` | optional | `api` (default) or `hybrid`. `api` = API for everything. `hybrid` = DB-direct reads + API-routed writes. Unknown values fall back to `api`. Surfaced to the client read-only via `usePublicConfig().dataSource`. |
+| `OPENPROJECT_DB_URL` | when `OPIRA_DATA_SOURCE=hybrid` | PostgreSQL connection string for OpenProject's database. Server-only — never log, never commit. |
+| `OPENPROJECT_DB_POOL_MAX` | optional | Max DB connections per Next.js process in hybrid mode (default 5). |
+| `OPIRA_TEST_DB_URL` | optional | Connection string for the test Postgres used by `lib/data/db/schema-canary.test.js`; the canary is skipped when unset. |
 
 OAuth redirect URI: `<AUTH_URL>/api/auth/callback/openproject`.
 
@@ -65,13 +75,16 @@ OAuth redirect URI: `<AUTH_URL>/api/auth/callback/openproject`.
 ## Scripts
 
 ```
-npm run dev     # Next dev (Turbopack)
-npm run build   # production build (output: standalone)
+npm run dev            # Next dev (Turbopack)
+npm run build          # production build (output: standalone)
 npm run start
-npm run lint    # eslint-config-next
+npm run lint           # eslint-config-next
+npm test               # Vitest watch
+npm run test:run       # Vitest one-shot (CI)
+npm run test:coverage  # Vitest + v8 coverage
 ```
 
-There is no test suite in this repo today; do not add one without first agreeing on the testing strategy with the maintainer.
+A Vitest suite lives next to the data-layer code (`lib/data/**/*.test.js`). Tests are scoped to the abstraction's contract — same input → same UI shape from both the API and DB repositories. The schema canary (`lib/data/db/schema-canary.test.js`) is skipped unless `OPIRA_TEST_DB_URL` is set. See [docs/data-layer.md](docs/data-layer.md) for the testing strategy.
 
 ## When making changes
 

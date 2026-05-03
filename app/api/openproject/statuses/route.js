@@ -1,13 +1,15 @@
-import { opFetch, withQuery } from "@/lib/openproject/client";
 import { errorResponse } from "@/lib/openproject/route-utils";
-import { elementsOf, mapStatus } from "@/lib/openproject/mappers";
+import { getRepositories } from "@/lib/data/factory";
+import { buildAuthzContext } from "@/lib/data/authz/context";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const hal = await opFetch(withQuery("/statuses", { pageSize: "100" }));
-    return Response.json(elementsOf(hal).map(mapStatus));
+    const ctx = await buildAuthzContext();
+    const { lookups: repo } = getRepositories();
+    const result = await repo.statuses(ctx);
+    return Response.json(result);
   } catch (e) {
     return errorResponse(e);
   }

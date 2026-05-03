@@ -1,22 +1,24 @@
-import { opFetch, opFetchMultipart } from "@/lib/openproject/client";
-import { elementsOf, mapAttachment } from "@/lib/openproject/mappers";
-import { errorResponse, nativeId } from "@/lib/openproject/route-utils";
+import { errorResponse } from "@/lib/openproject/route-utils";
+import { getRepositories } from "@/lib/data/factory";
+import { buildAuthzContext } from "@/lib/data/authz/context";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req, ctx) {
+export async function GET(_req, ctxArg) {
   try {
-    const { id } = await ctx.params;
-    const hal = await opFetch(`/work_packages/${nativeId(id)}/attachments`);
-    return Response.json(elementsOf(hal).map(mapAttachment));
+    const { id } = await ctxArg.params;
+    const ctx = await buildAuthzContext();
+    const { attachments: repo } = getRepositories();
+    const result = await repo.list(ctx, { workPackageId: id });
+    return Response.json(result);
   } catch (e) {
     return errorResponse(e);
   }
 }
 
-export async function POST(req, ctx) {
+export async function POST(req, ctxArg) {
   try {
-    const { id } = await ctx.params;
+    const { id } = await ctxArg.params;
     const incoming = await req.formData();
     const file = incoming.get("file");
     const description = incoming.get("description") || "";
@@ -28,25 +30,19 @@ export async function POST(req, ctx) {
       fileName,
       description: description ? { raw: String(description) } : undefined,
     };
-    // Re-buffer the file. Re-appending a File object across FormData instances
-    // sometimes leaves a half-consumed stream by the time undici streams it
-    // upstream, which OpenProject answers with 500. A fresh Blob from an
-    // ArrayBuffer is always cleanly seekable.
+    // Re-buffer the file (see prior route comment for the why).
     const fileBuf = await file.arrayBuffer();
     const fileBlob = new Blob([fileBuf], {
       type: file.type || "application/octet-stream",
     });
     const fd = new FormData();
-    // Metadata MUST be appended as a plain string, not a Blob. undici sets
-    // `filename="blob"` on Blob parts, which makes OpenProject's Rack parser
-    // treat the metadata part as a file upload. The controller then receives
-    // a Hash (tempfile/filename/type) where it expects a JSON string and
-    // throws `no implicit conversion of HashWithIndifferentAccess into String`.
-    // A plain string append produces a text form field that OP JSON-parses.
     fd.append("metadata", JSON.stringify(metadata));
     fd.append("file", fileBlob, fileName);
-    const a = await opFetchMultipart(`/work_packages/${nativeId(id)}/attachments`, fd);
-    return Response.json(mapAttachment(a));
+
+    const ctx = await buildAuthzContext();
+    const { attachments: repo } = getRepositories();
+    const created = await repo.create(ctx, { workPackageId: id, formData: fd });
+    return Response.json(created);
   } catch (e) {
     return errorResponse(e);
   }

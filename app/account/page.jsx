@@ -13,6 +13,7 @@ import { useMe } from "@/lib/hooks/use-openproject-detail";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
 import { ThemePicker } from "@/components/theme-switch";
 import { WorkingHoursCard } from "@/components/working-hours-card";
+import { DataSourceCard } from "@/components/data-source-card";
 import { usePublicConfig } from "@/components/config-provider";
 
 // All editable account fields (name, email, avatar, language, timezone,
@@ -292,6 +293,8 @@ export default function AccountPage() {
           </p>
           <WorkingHoursCard userId={sessionUser?.id || opMe.data?.id || null} />
         </section>
+
+        <DataSourceCard />
 
         {/* ── Data refresh ────────────────────────────────────────── */}
         <section className="bg-surface-elevated border border-border rounded-2xl p-6 mb-6">

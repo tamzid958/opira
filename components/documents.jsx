@@ -12,6 +12,7 @@ import {
   useProjectDocuments,
 } from "@/lib/hooks/use-openproject-detail";
 import { useApiStatus } from "@/lib/hooks/use-openproject";
+import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { friendlyError } from "@/lib/api-client";
 
 // Confluence-style reading surface for OpenProject "documents". The OP
@@ -28,10 +29,11 @@ const SORTS = [
 
 export function Documents({ projectId, projectName }) {
   const listQ = useProjectDocuments(projectId);
-  const [selectedId, setSelectedId] = useState(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("recent");
   const status = useApiStatus();
+  const { params, setParams } = useUrlParams();
+  const selectedId = params.get("doc") || null;
 
   const docs = (() => {
     const list = listQ.data || [];
@@ -50,20 +52,24 @@ export function Documents({ projectId, projectName }) {
     });
   })();
 
-  // Auto-select the first document when the list loads or the active
-  // selection no longer exists in the visible set. Computed during render
-  // so React doesn't double-commit (was a setState-in-effect before).
+  // If the URL doc is missing or no longer in the visible set, fall back to
+  // the first visible doc and replace the URL so the deep link stays valid.
+  // Render uses `desiredId` immediately; the URL gets reconciled in an
+  // effect (calling setParams during render schedules a state update on
+  // Next's LinkComponent and React rightly flags that as setState-in-render).
   const desiredId = !docs.length
     ? null
     : selectedId && docs.find((d) => d.id === selectedId)
       ? selectedId
       : docs[0].id;
-  if (desiredId !== selectedId) {
-    setSelectedId(desiredId);
-  }
+  useEffect(() => {
+    if (desiredId !== selectedId) {
+      setParams({ doc: desiredId });
+    }
+  }, [desiredId, selectedId, setParams]);
 
-  const docQ = useDocument(selectedId, !!selectedId);
-  const selected = docQ.data || docs.find((d) => d.id === selectedId) || null;
+  const docQ = useDocument(desiredId, !!desiredId);
+  const selected = docQ.data || docs.find((d) => d.id === desiredId) || null;
 
   const opLink = (() => {
     const base = status.data?.baseUrl;
@@ -135,9 +141,9 @@ export function Documents({ projectId, projectName }) {
                 <li key={d.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(d.id)}
+                    onClick={() => setParams({ doc: d.id }, { replace: false })}
                     className={`w-full text-left px-3 py-2.5 border-b border-border-soft cursor-pointer transition-colors ${
-                      selectedId === d.id
+                      desiredId === d.id
                         ? "bg-accent-50 border-l-[3px] border-l-accent"
                         : "hover:bg-surface-subtle border-l-[3px] border-l-transparent"
                     }`}
@@ -147,14 +153,14 @@ export function Documents({ projectId, projectName }) {
                         name="paperclip"
                         size={11}
                         className={
-                          selectedId === d.id ? "text-accent-700 mt-1 shrink-0" : "text-fg-subtle mt-1 shrink-0"
+                          desiredId === d.id ? "text-accent-700 mt-1 shrink-0" : "text-fg-subtle mt-1 shrink-0"
                         }
                         aria-hidden="true"
                       />
                       <div className="min-w-0 flex-1">
                         <div
                           className={`text-[12.5px] truncate ${
-                            selectedId === d.id
+                            desiredId === d.id
                               ? "font-semibold text-accent-700"
                               : "font-medium text-fg"
                           }`}
