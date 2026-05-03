@@ -448,17 +448,6 @@ export default function BoardPage({ params: paramsPromise }) {
     });
 
   // ── Filter-bar metadata ────────────────────────────────────────────────
-  // Per-view "relevant" kinds — the ones the user can still meaningfully
-  // pick from in this view. A kind is *redundant* in a view when the view
-  // already lays cards out along that axis (status as kanban columns,
-  // assignee as swimlane rows). Redundant kinds are hidden from the
-  // "+ Filter" picker but still rendered as chips when they happen to be
-  // set, so switching view doesn't silently drop existing filters.
-  const RELEVANT_FILTER_KINDS_BY_VIEW = {
-    kanban: ["assignee", "type", "label"],
-    swimlanes: ["type", "label", "status"],
-    list: ["assignee", "type", "label", "status"],
-  };
 
   const chipMeta = (kind) => {
     switch (kind) {
@@ -512,9 +501,9 @@ export default function BoardPage({ params: paramsPromise }) {
   const activeFilterKinds = allFilterKinds.filter(
     (k) => filters[k] && filters[k] !== "all",
   );
-  const availableFilterKinds = (
-    RELEVANT_FILTER_KINDS_BY_VIEW[view] || allFilterKinds
-  ).filter((k) => filters[k] === "all" || !filters[k]);
+  const availableFilterKinds = allFilterKinds.filter(
+    (k) => filters[k] === "all" || !filters[k],
+  );
 
   // While loading, render a stable shell — generic title, no chips, no
   // sprint selector — so nothing in the chrome morphs from placeholder to
