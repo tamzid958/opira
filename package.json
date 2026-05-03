@@ -1,6 +1,6 @@
 {
   "name": "opira",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Opira — a modern, opinionated UI for OpenProject. Sprint board, backlog, timeline, reports and more, served from a Next.js App Router app over the OpenProject OAuth + v3 API.",
   "private": true,
   "license": "MIT",
