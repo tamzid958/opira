@@ -97,7 +97,14 @@ export async function GET(_req, ctx) {
       };
     }
     const value = { schema, fields };
-    CACHE.set(schema, value);
+    // Only cache once every CustomOption field has a usable option source
+    // (either an inlined list or an href the client can resolve). Caching a
+    // degraded response would pin "no picker" for the full TTL whenever the
+    // form fallback briefly fails.
+    const isComplete = Object.values(fields).every(
+      (f) => f.type !== "CustomOption" || f.allowedValues || f.allowedValuesHref,
+    );
+    if (isComplete) CACHE.set(schema, value);
     return Response.json(value);
   } catch (e) {
     return errorResponse(e);
