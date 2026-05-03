@@ -322,7 +322,7 @@ git checkout -b feat/<short-name>          # or fix/, refactor/, docs/, chore/, 
 # …make your changes…
 npm run lint && npm run build              # both must pass
 git commit -m "feat(board): swimlanes by assignee"
-# Open a PR against `master`. Attach a screen-record for any UI change.
+# Open a PR against `main`. Attach a screen-record for any UI change.
 ```
 
 Conventional prefixes: `feat:` · `fix:` · `refactor:` · `docs:` · `chore:` · `test:`. Code of Conduct in [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).

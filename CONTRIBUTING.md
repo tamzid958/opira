@@ -32,7 +32,7 @@ OAuth application registration is documented in the [README](./README.md#registe
 ## Before you open a PR
 
 1. Fork the repository.
-2. Branch from `master`. Name the branch after the change: `feat/board-swimlanes`, `fix/sprint-points-rollup`, `docs/screenshots`.
+2. Branch from `main`. Name the branch after the change: `feat/board-swimlanes`, `fix/sprint-points-rollup`, `docs/screenshots`.
 3. Keep the diff focused — one PR, one concern.
 4. Run `npm run build` and `npm run lint` locally and make sure both pass.
 5. Open a PR and fill the template. Link any related issue.
