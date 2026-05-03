@@ -46,11 +46,11 @@ ENV NODE_ENV=production \
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 --ingroup nodejs nextjs
 
-# Bring across only the standalone bundle, the public/ folder, and
-# the static chunks Next serves directly from disk.
+# Bring across only the standalone bundle and the static chunks Next
+# serves directly from disk. (No `public/` folder in this repo — add a
+# COPY line back if one is introduced.)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static     ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public           ./public
 
 USER nextjs
 EXPOSE 3000
