@@ -141,12 +141,20 @@ export function Menu({
         return (
           <div
             key={i}
-            onClick={() => {
+            onClick={(e) => {
+              // Menu renders via portal to document.body, but React still
+              // bubbles synthetic events through the React tree — so a click
+              // here would otherwise reach the parent row's onClick (which
+              // typically opens a detail modal). Stop propagation here so
+              // every Menu use site is protected without per-call boilerplate.
+              e.stopPropagation();
               if (!it.disabled) {
                 onSelect(it);
                 onClose();
               }
             }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
             className={cn(
               "flex items-center gap-2 px-2.5 py-1.5 rounded text-[13px] cursor-pointer transition-colors",
               it.disabled

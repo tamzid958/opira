@@ -63,7 +63,7 @@ export function DatePicker({
         ref={triggerRef}
         type="button"
         className={[
-          "inline-flex items-center gap-1.5 w-full h-9 px-2.5 rounded-md border border-border bg-surface-elevated text-[13px] text-fg text-left transition-colors hover:bg-surface-subtle hover:border-border-strong",
+          "inline-flex items-center gap-1.5 w-full min-w-0 h-9 px-2.5 rounded-md border border-border bg-surface-elevated text-[13px] text-fg text-left transition-colors hover:bg-surface-subtle hover:border-border-strong",
           disabled && "opacity-60 cursor-default hover:bg-surface-elevated hover:border-border",
         ]
           .filter(Boolean)
@@ -73,12 +73,14 @@ export function DatePicker({
         aria-disabled={disabled || undefined}
         title={disabled ? "You don't have permission to do that." : undefined}
       >
-        <Icon name="calendar" size={13} className="text-fg-subtle" aria-hidden="true" />
-        {value ? (
-          format(parseISO(value), "MMM d, yyyy")
-        ) : (
-          <span className="text-fg-faint">{placeholder}</span>
-        )}
+        <Icon name="calendar" size={13} className="text-fg-subtle shrink-0" aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate">
+          {value ? (
+            format(parseISO(value), "MMM d, yyyy")
+          ) : (
+            <span className="text-fg-faint">{placeholder}</span>
+          )}
+        </span>
       </button>
       {mounted && open &&
         createPortal(
