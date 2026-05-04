@@ -65,7 +65,7 @@ Both modes go through the Repository layer in [lib/data/](lib/data/) and produce
 | `HOURS_PER_POINT` | optional | Numeric multiplier for the capacity calculation; server-only. |
 | `OPIRA_DATA_SOURCE` | optional | `api` (default) or `hybrid`. `api` = API for everything. `hybrid` = DB-direct reads + API-routed writes. Unknown values fall back to `api`. Surfaced to the client read-only via `usePublicConfig().dataSource`. |
 | `OPENPROJECT_DB_URL` | when `OPIRA_DATA_SOURCE=hybrid` | PostgreSQL connection string for OpenProject's database. Server-only — never log, never commit. |
-| `OPENPROJECT_DB_POOL_MAX` | optional | Max DB connections per Next.js process in hybrid mode (default 5). |
+| `OPENPROJECT_DB_POOL_MAX` | optional | Max DB connections per Next.js process in hybrid mode (default 10). |
 | `OPIRA_TEST_DB_URL` | optional | Connection string for the test Postgres used by `lib/data/db/schema-canary.test.js`; the canary is skipped when unset. |
 
 OAuth redirect URI: `<AUTH_URL>/api/auth/callback/openproject`.

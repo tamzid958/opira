@@ -1,43 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { usePublicConfig } from "@/components/config-provider";
 
-// Pulls `/api/health/data-source` once on mount, shows mode + latencies.
-// Surfaces the same shape the server emits:
+// Surfaces the shape `/api/health/data-source` emits:
 //   api    → { mode: "api", ok, latencyMs }
 //   hybrid → { mode: "hybrid", ok, dbLatencyMs, apiLatencyMs }
+async function fetchHealth() {
+  const res = await fetch("/api/health/data-source", { cache: "no-store" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(body?.error || "Probe failed");
+    err.body = body;
+    throw err;
+  }
+  return body;
+}
+
 export function DataSourceCard() {
   const { dataSource } = usePublicConfig();
-  const [state, setState] = useState({ status: "loading", data: null });
+  const { data, error, isLoading } = useQuery({
+    queryKey: ["health", "data-source"],
+    queryFn: fetchHealth,
+    staleTime: 30_000,
+    retry: false,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/health/data-source", { cache: "no-store" })
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}));
-        if (!cancelled) {
-          setState({ status: res.ok ? "ok" : "error", data: body });
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setState({ status: "error", data: { error: e?.message } });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const { status, data } = state;
   const mode = data?.mode || dataSource || "api";
   const ok = data?.ok === true;
+  const errorMessage = error?.message || data?.error || null;
 
-  const dot =
-    status === "loading"
-      ? "bg-fg-faint animate-pulse"
-      : ok
-        ? "bg-success"
-        : "bg-pri-high";
+  const dot = isLoading
+    ? "bg-fg-faint animate-pulse"
+    : ok
+      ? "bg-success"
+      : "bg-pri-high";
 
   return (
     <section className="bg-surface-elevated border border-border rounded-2xl p-5 mb-6">
@@ -63,11 +60,11 @@ export function DataSourceCard() {
           : "Every read and write goes through OpenProject's v3 API."}
       </p>
 
-      {status === "loading" ? (
+      {isLoading ? (
         <div className="text-[12px] text-fg-faint">Probing…</div>
       ) : !ok ? (
         <div className="text-[12px] text-pri-high">
-          Probe failed{data?.error ? `: ${data.error}` : ""}
+          Probe failed{errorMessage ? `: ${errorMessage}` : ""}
         </div>
       ) : (
         <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[12px] m-0">

@@ -164,7 +164,7 @@ docker compose up -d --build
 | `AUTH_URL` | prod only | Public origin. Auto-detected in dev; **set explicitly in production**. |
 | `OPIRA_DATA_SOURCE` | optional | `api` (default) or `hybrid`. See [Data sources](#-data-sources). |
 | `OPENPROJECT_DB_URL` | when `hybrid` | PostgreSQL connection string for OpenProject's database. Server-only — never log, never commit. |
-| `OPENPROJECT_DB_POOL_MAX` | optional | Max DB connections this Next.js process holds open (default `5`). |
+| `OPENPROJECT_DB_POOL_MAX` | optional | Max DB connections this Next.js process holds open (default `10`). |
 | `OPENPROJECT_STORY_POINTS_FIELD` | optional | `storyPoints` (default) or a custom-field key like `customField7`. |
 | `OPENPROJECT_WORKING_DAYS` | optional | Comma-separated day prefixes for burndown / capacity (default `Mon,Tue,Wed,Thu,Fri`). |
 | `HOURS_PER_POINT` | optional | Hours-per-point for the capacity view (default `4`). |
