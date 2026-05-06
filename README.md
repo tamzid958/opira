@@ -204,6 +204,47 @@ Open a work package, switch the right sidebar to the **Poker** tab, and you're i
 
 The Poker tab only appears when the project's story-points field is configured as a t-shirt-style `CustomOption` (see `OPENPROJECT_STORY_POINTS_FIELD`). Numeric / duration fields keep working through the regular picker.
 
+### How it fans out
+
+```mermaid
+flowchart LR
+  subgraph Browsers
+    A["Browser A<br/>(/projects/.../?wp=42, Poker tab)"]
+    B["Browser B<br/>(/projects/.../?wp=42, Poker tab)"]
+  end
+
+  subgraph Pods["Next.js (1+ pods)"]
+    P1["Pod 1<br/>SSE stream + POST handlers"]
+    P2["Pod 2<br/>SSE stream + POST handlers"]
+  end
+
+  subgraph Store["lib/poker — async facade"]
+    direction TB
+    Facade["room-store.js<br/>(picks backend at module load)"]
+    Mem[("memory-store.js<br/>Map&lt;roomId, RoomState&gt;<br/>30-min idle eviction")]
+    Redis[("redis-store.js<br/>opira:poker:room:&#123;id&#125;<br/>WATCH/MULTI + pub/sub")]
+    Facade -- "OPIRA_REDIS_URL unset" --> Mem
+    Facade -- "OPIRA_REDIS_URL set" --> Redis
+  end
+
+  RedisSrv[("Redis<br/>JSON blob per room<br/>30-min TTL<br/>opira:poker:room:&#123;id&#125;:events")]
+
+  A <-- "EventSource<br/>SSE" --> P1
+  B <-- "EventSource<br/>SSE" --> P2
+  P1 --> Facade
+  P2 --> Facade
+  Redis <--> RedisSrv
+
+  classDef pod fill:#eef,stroke:#447
+  classDef store fill:#efe,stroke:#474
+  classDef ext fill:#fee,stroke:#744
+  class P1,P2 pod
+  class Mem,Redis,Facade store
+  class RedisSrv ext
+```
+
+A vote on Pod 1 writes to Redis and `PUBLISH`es on the room's channel. Pod 2's subscriber wakes up, re-fetches `getPublicState`, and pushes a `room.state` event down its SSE pipe to Browser B. Without Redis, the same flow stays inside one pod's `Map`.
+
 ### Two backends, one signature
 
 The room store ([lib/poker/](./lib/poker/)) is an async facade that picks at module load:
@@ -217,16 +258,18 @@ If Redis is configured but unreachable, the SSE stream + POST routes return `503
 
 ### Wiring Redis with Compose
 
-`docker-compose.yml` ships a `redis` service under the `poker` profile. Bring it up and point Opira at it:
+`docker-compose.yml` ships a `redis` service alongside `opira`. Just set `OPIRA_REDIS_URL` in `.env` and bring the stack up — Opira `depends_on: redis (service_healthy)` so it waits for Redis before starting.
 
 ```bash
 # In .env
 OPIRA_REDIS_URL=redis://redis:6379
 
-docker compose --profile poker up -d
+docker compose up -d
 ```
 
-That gives you a 64 MB Redis with `allkeys-lru` eviction, no persistence (rooms are intentionally ephemeral), and a healthcheck. Uncomment the `depends_on` block on the `opira` service in the compose file if you want the app to wait for Redis to be healthy before starting.
+The bundled Redis is hardened for the poker workload: 64 MB memory cap with `allkeys-lru` eviction, AOF persistence on a `redis-data` volume so a container restart mid-vote doesn't reset live rooms, no port mapping (the Compose network is the auth boundary — there's no password). Inspect with `docker compose exec redis redis-cli`.
+
+If you'd rather not run Redis at all, leave `OPIRA_REDIS_URL` unset — Opira falls back to the in-memory store. The Redis container will still come up unused; remove it from `docker-compose.yml` if you want to skip it entirely.
 
 ---
 

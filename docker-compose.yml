@@ -1,6 +1,6 @@
-# Opira production stack: Next.js (standalone) container, exposed on
-# port 3000. Put a TLS-terminating reverse proxy in front of it
-# (nginx, Traefik, your cloud's load balancer) — this stack is the
+# Opira production stack: Next.js (standalone) container + Redis,
+# exposed on port 3000. Put a TLS-terminating reverse proxy in front of
+# it (nginx, Traefik, your cloud's load balancer) — this stack is the
 # app only, not the edge.
 #
 # Quick start (no clone needed)
@@ -8,6 +8,8 @@
 #      curl -fsSLO https://raw.githubusercontent.com/tamzid958/opira/main/.env.local.example
 #      mv .env.local.example .env
 #      $EDITOR .env             # fill in OAuth client / secret / AUTH_SECRET / AUTH_URL
+#                               # set OPIRA_REDIS_URL=redis://redis:6379 to wire Opira
+#                               # to the Redis service below
 #   2. docker compose up -d
 #   3. Visit http://localhost:3000
 #
@@ -16,15 +18,6 @@
 #
 # To build from source instead of pulling: `docker compose up -d --build`
 # (works because both `image:` and `build:` are declared below).
-#
-# Planning poker (optional, multi-pod):
-#   1. Add `OPIRA_REDIS_URL=redis://redis:6379` to `.env`
-#   2. Uncomment the `depends_on` block on the `opira` service below
-#   3. Bring up the poker profile:
-#        docker compose --profile poker up -d
-#   Without this, planning-poker rooms still work but stay in-process
-#   (single pod, lost on restart) — acceptable for solo / small-team
-#   deployments.
 
 services:
   opira:
@@ -37,32 +30,31 @@ services:
       - .env
     ports:
       - "3000:3000"
-    # Uncomment if you enable the `redis` service below — Compose
-    # already starts services in dependency order, but `depends_on`
-    # makes the relationship explicit.
-    # depends_on:
-    #   redis:
-    #     condition: service_healthy
+    depends_on:
+      redis:
+        condition: service_healthy
 
-  # Optional: Redis backs the planning-poker rooms in
-  # `lib/poker/redis-store.js`. Without this service the FAB falls
-  # back to a single-process in-memory store — fine for single-pod
-  # deployments, but rooms don't survive container restarts and
-  # don't sync across replicas. Set `OPIRA_REDIS_URL=redis://redis:6379`
-  # in `.env` to wire Opira to this service.
+  # Backs the planning-poker rooms in `lib/poker/redis-store.js`. Set
+  # OPIRA_REDIS_URL=redis://redis:6379 in `.env` to wire Opira to this
+  # service. If OPIRA_REDIS_URL is unset, Opira ignores this service
+  # and falls back to a single-process in-memory store (still works,
+  # but rooms don't fan out across pods).
   #
-  # Enable with: `docker compose --profile poker up -d`
+  # Persistence: AOF is enabled so a container restart mid-vote
+  # doesn't reset the round — keys come back with their original 30-min
+  # TTL still ticking. Memory is capped at 64 MB with allkeys-lru so
+  # a runaway producer can't OOM the host or fill the AOF disk.
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 15s
+      interval: 10s
       timeout: 3s
       retries: 5
-    profiles:
-      - poker
     # ⚠ Do NOT add a `ports:` mapping here. This Redis has no
     # password (the network IS the auth boundary). Opira reaches it
     # as `redis://redis:6379` over Compose's internal bridge — that's
@@ -81,3 +73,6 @@ services:
     command: --cleanup --interval 21600 opira
     profiles:
       - autoupdate
+
+volumes:
+  redis-data:
