@@ -67,6 +67,7 @@ Both modes go through the Repository layer in [lib/data/](lib/data/) and produce
 | `OPENPROJECT_DB_URL` | when `OPIRA_DATA_SOURCE=hybrid` | PostgreSQL connection string for OpenProject's database. Server-only — never log, never commit. |
 | `OPENPROJECT_DB_POOL_MAX` | optional | Max DB connections per Next.js process in hybrid mode (default 10). |
 | `OPIRA_TEST_DB_URL` | optional | Connection string for the test Postgres used by `lib/data/db/schema-canary.test.js`; the canary is skipped when unset. |
+| `OPIRA_REDIS_URL` | optional | Redis connection string for the planning-poker FAB ([lib/poker/](lib/poker/)). Unset → single-process in-memory store (rooms don't survive restart and don't fan out across pods). Set → rooms are JSON blobs with a 30-min idle TTL and pub/sub fans out across instances. Server-only. If set but unreachable, SSE/POST return 503 and the FAB shows "Room offline" — the regular `TShirtPicker` keeps working. |
 
 OAuth redirect URI: `<AUTH_URL>/api/auth/callback/openproject`.
 

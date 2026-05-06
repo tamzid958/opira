@@ -30,6 +30,7 @@ import { TimeEntriesPanel } from "@/components/time-entries-panel";
 import { RemindersPanel } from "@/components/reminders-panel";
 import { TShirtPicker } from "@/components/tshirt-picker";
 import { EstimatePicker } from "@/components/estimate-picker";
+import { PokerTab } from "@/components/poker-tab";
 import {
   RichTextEditor,
   isHtmlEmpty,
@@ -250,6 +251,17 @@ export function TaskDetail({
     task?.descriptionHtml || task?.description || "",
   );
   const [commentPage, setCommentPage] = useState(1);
+  // Right-sidebar tab state: "details" (existing fields) or "poker"
+  // (the planning-poker room). Reset back to "details" when the user
+  // navigates to a different task so they don't silently join a
+  // different room. Render-time setState is React 19's recommended
+  // way to reset state from a prop change without an Effect.
+  const [sideTab, setSideTab] = useState("details");
+  const [lastSideTaskId, setLastSideTaskId] = useState(taskId);
+  if (taskId !== lastSideTaskId) {
+    setLastSideTaskId(taskId);
+    if (sideTab !== "details") setSideTab("details");
+  }
   const subtaskRef = useRef(null);
   const attachmentsRef = useRef(null);
 
@@ -844,6 +856,41 @@ export function TaskDetail({
 
         {/* ── Side panel ─────────────────────────────────────────────── */}
         <aside className="border-t xl:border-t-0 xl:border-l border-border-soft bg-surface-sunken overflow-y-auto px-4 pt-4 sm:pt-5 pb-6 min-w-0">
+          {spIsCustomOption && Array.isArray(spOptions) && spOptions.length > 0 && canEdit && (
+            <div className="flex gap-0.5 border-b border-border mb-4">
+              {[
+                { id: "details", label: "Details" },
+                { id: "poker", label: "Poker" },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setSideTab(t.id)}
+                  className={cn(
+                    "px-3 py-1.5 text-[12.5px] cursor-pointer border-b-2 -mb-px transition-colors",
+                    sideTab === t.id
+                      ? "text-accent-700 border-accent font-semibold"
+                      : "text-fg-subtle border-transparent hover:text-fg font-medium",
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {sideTab === "poker" && (
+            <PokerTab
+              task={task}
+              allowed={spOptions}
+              canEdit={canEdit}
+              onUpdate={onUpdate}
+              onApplied={() => setSideTab("details")}
+            />
+          )}
+
+          {sideTab === "details" && (
+            <>
           {/* Reminders */}
           <div className="mb-5">
             <div className="text-[11px] font-semibold text-fg-subtle uppercase tracking-wider mb-1.5">
@@ -1155,6 +1202,8 @@ export function TaskDetail({
               Updated {task.updatedAt ? formatRelDate(task.updatedAt) : "—"}
             </div>
           </div>
+            </>
+          )}
         </aside>
       </div>
     </div>

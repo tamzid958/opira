@@ -16,6 +16,15 @@
 #
 # To build from source instead of pulling: `docker compose up -d --build`
 # (works because both `image:` and `build:` are declared below).
+#
+# Planning poker (optional, multi-pod):
+#   1. Add `OPIRA_REDIS_URL=redis://redis:6379` to `.env`
+#   2. Uncomment the `depends_on` block on the `opira` service below
+#   3. Bring up the poker profile:
+#        docker compose --profile poker up -d
+#   Without this, planning-poker rooms still work but stay in-process
+#   (single pod, lost on restart) — acceptable for solo / small-team
+#   deployments.
 
 services:
   opira:
@@ -28,6 +37,37 @@ services:
       - .env
     ports:
       - "3000:3000"
+    # Uncomment if you enable the `redis` service below — Compose
+    # already starts services in dependency order, but `depends_on`
+    # makes the relationship explicit.
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
+
+  # Optional: Redis backs the planning-poker rooms in
+  # `lib/poker/redis-store.js`. Without this service the FAB falls
+  # back to a single-process in-memory store — fine for single-pod
+  # deployments, but rooms don't survive container restarts and
+  # don't sync across replicas. Set `OPIRA_REDIS_URL=redis://redis:6379`
+  # in `.env` to wire Opira to this service.
+  #
+  # Enable with: `docker compose --profile poker up -d`
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - poker
+    # ⚠ Do NOT add a `ports:` mapping here. This Redis has no
+    # password (the network IS the auth boundary). Opira reaches it
+    # as `redis://redis:6379` over Compose's internal bridge — that's
+    # the only path that should exist. If you ever need to inspect
+    # it, exec in: `docker compose exec redis redis-cli`.
 
   # Optional: auto-pull new images and restart the container when a
   # new release lands on ghcr.io. Polls every 6h. Comment out the whole

@@ -78,6 +78,7 @@ OpenProject is a powerful, open-source project-management server. Its UI is comp
 - ✅ **Offline queue** — mutations replay on reconnect
 - ✅ **Optimistic updates with rollback** — the UI never lies to you
 - ✅ **In-app upgrade banner** — signed-in users see when a new release is available
+- ✅ **Planning poker** (t-shirt) — live multi-player voting room per work package, optional Redis backend for multi-pod fan-out
 
 </details>
 
@@ -169,6 +170,7 @@ docker compose up -d --build
 | `OPENPROJECT_WORKING_DAYS` | optional | Comma-separated day prefixes for burndown / capacity (default `Mon,Tue,Wed,Thu,Fri`). |
 | `HOURS_PER_POINT` | optional | Hours-per-point for the capacity view (default `4`). |
 | `OPIRA_TEST_DB_URL` | optional | Connection string used by the schema canary + DB integration tests (skipped when unset). |
+| `OPIRA_REDIS_URL` | optional | Redis connection string for the [planning-poker](#-planning-poker) rooms. Unset → in-memory single-pod store. Set → rooms persist across pods with a 30-min idle TTL. Server-only. |
 
 All env vars are read at request time on the server. Values the client needs (`OPENPROJECT_URL`, `OPENPROJECT_STORY_POINTS_FIELD`, `OPENPROJECT_WORKING_DAYS`, plus a read-only `dataSource` indicator) are surfaced through React context — no `NEXT_PUBLIC_*` baking, no rebuild to change envs. Server-only secrets (`AUTH_SECRET`, OAuth client secret, `OPENPROJECT_DB_URL`) **never reach the browser**.
 
@@ -193,6 +195,38 @@ OPENPROJECT_DB_URL=postgres://op_user:secret@db.internal:5432/openproject_produc
 Health probe: `curl http://localhost:3000/api/health/data-source` → `{mode: "hybrid", ok: true, dbLatencyMs: …, apiLatencyMs: …}`.
 
 Architecture details and how-to-add-an-entity are in [docs/data-layer.md](./docs/data-layer.md).
+
+---
+
+## 🃏 Planning poker
+
+Open a work package, switch the right sidebar to the **Poker** tab, and you're in a live voting room — one room per work package, joined automatically by anyone with edit access. Cast a card, hit **Reveal** when everyone's in, and **Apply** writes the agreed size back to OpenProject through the same `useUpdateTask` mutation any other estimate uses (so journals, notifications, and `lockVersion` all behave normally).
+
+The Poker tab only appears when the project's story-points field is configured as a t-shirt-style `CustomOption` (see `OPENPROJECT_STORY_POINTS_FIELD`). Numeric / duration fields keep working through the regular picker.
+
+### Two backends, one signature
+
+The room store ([lib/poker/](./lib/poker/)) is an async facade that picks at module load:
+
+| Backend | Selected when | Behaviour |
+|---|---|---|
+| **In-memory** | `OPIRA_REDIS_URL` unset (default) | `Map<roomId, RoomState>` per Next.js process. 30-min idle eviction. Lost on restart. **Single pod only** — different replicas won't see each other's rooms. |
+| **Redis** | `OPIRA_REDIS_URL` set | Whole-room JSON blob at `opira:poker:room:{roomId}`, 30-min TTL refreshed on every write. Mutations use WATCH/MULTI for atomic R-M-W. Pub/sub on `…:events` fans state changes out to every connected pod. **Multi-pod safe.** Rooms still ephemeral — TTL expires and rooms vanish. |
+
+If Redis is configured but unreachable, the SSE stream + POST routes return `503` and the FAB shows "Room offline" — the regular `TShirtPicker` keeps working for solo single-click estimates.
+
+### Wiring Redis with Compose
+
+`docker-compose.yml` ships a `redis` service under the `poker` profile. Bring it up and point Opira at it:
+
+```bash
+# In .env
+OPIRA_REDIS_URL=redis://redis:6379
+
+docker compose --profile poker up -d
+```
+
+That gives you a 64 MB Redis with `allkeys-lru` eviction, no persistence (rooms are intentionally ephemeral), and a healthcheck. Uncomment the `depends_on` block on the `opira` service in the compose file if you want the app to wait for Redis to be healthy before starting.
 
 ---
 

@@ -1,0 +1,65 @@
+# Per-PR + per-push checks. Cheap, fast, no secrets — meant to be the
+# baseline gate every change crosses. Slower / privileged jobs live in
+# their own workflows (`release.yml` on tag push, `schema-canary.yml`
+# on a weekly cron).
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Cancel in-flight runs for the same PR / branch when a newer commit
+# arrives. The freshest run is always the one that matters.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Spin up a real Redis 7 alongside the job so the planning-poker
+    # store's WATCH/MULTI + pub/sub paths run against the actual
+    # protocol in CI, not just ioredis-mock. Tests that don't need
+    # Redis simply ignore the URL.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        env:
+          # Hand the running Redis to any tests that opt in. The
+          # default poker tests use `ioredis-mock` so they don't
+          # need this — but having it set means future integration
+          # tests can flip the facade by reading process.env.
+          OPIRA_REDIS_URL: redis://127.0.0.1:6379
+        run: npm run test:run
