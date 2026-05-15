@@ -4,6 +4,7 @@ import {
   buildMembershipPatchBody,
   mapMembership,
 } from "@/lib/openproject/mappers";
+import { flushAssigneesCache } from "@/lib/data/redis-lookups-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export async function PATCH(req, ctx) {
       method: "PATCH",
       body: JSON.stringify(body),
     });
+    void flushAssigneesCache();
     return Response.json(mapMembership(updated));
   } catch (e) {
     return errorResponse(e);
@@ -37,6 +39,7 @@ export async function DELETE(_req, ctx) {
     await opFetch(`/memberships/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    void flushAssigneesCache();
     return new Response(null, { status: 204 });
   } catch (e) {
     return errorResponse(e);

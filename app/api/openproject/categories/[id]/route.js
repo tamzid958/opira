@@ -1,6 +1,7 @@
 import { opFetch } from "@/lib/openproject/client";
 import { mapCategory } from "@/lib/openproject/mappers";
 import { errorResponse } from "@/lib/openproject/route-utils";
+import { flushCategoriesCache } from "@/lib/data/redis-lookups-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export async function PATCH(req, ctx) {
       method: "PATCH",
       body: JSON.stringify(body),
     });
+    void flushCategoriesCache();
     return Response.json(mapCategory(c));
   } catch (e) {
     return errorResponse(e);
@@ -41,6 +43,7 @@ export async function DELETE(_req, ctx) {
   try {
     const { id } = await ctx.params;
     await opFetch(`/categories/${id}`, { method: "DELETE" });
+    void flushCategoriesCache();
     return new Response(null, { status: 204 });
   } catch (e) {
     return errorResponse(e);
