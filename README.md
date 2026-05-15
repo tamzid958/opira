@@ -131,7 +131,7 @@ docker compose up -d --build
 | `OPENPROJECT_STORY_POINTS_FIELD` | optional | `storyPoints` (default) or `customFieldN` |
 | `OPENPROJECT_WORKING_DAYS` | optional | `Mon,Tue,Wed,Thu,Fri` default |
 | `HOURS_PER_POINT` | optional | `4` default |
-| `OPIRA_REDIS_URL` | optional | Redis for lookup caching + planning poker |
+| `OPIRA_REDIS_URL` | optional | Redis for multi-layer server cache + planning poker rooms |
 | `OLLAMA_BASE_URL` | optional | Enables AI assist (Ollama) |
 | `OLLAMA_API_KEY` | optional | For Ollama Cloud (server-only) |
 | `OLLAMA_MODEL` | optional | Model name (auto-discovered locally) |
@@ -168,7 +168,15 @@ The room store ([lib/poker/](./lib/poker/)) picks a backend at module load:
 
 If Redis is unreachable, the FAB shows "Room offline" — the regular `TShirtPicker` still works for solo estimates. Without Redis, the in-memory fallback works for single-pod deployments.
 
-When Redis is active, lookup data (statuses, types, schemas) is cached in `opira:lookups:*` keys (30-60 min TTL). Flush with `curl -X DELETE /api/openproject/lookups/cache`.
+When Redis is active, Opira maintains a two-layer server cache (in-process Map → Redis) across all reference data. The `DELETE /api/openproject/lookups/cache` endpoint (also the "Refresh data" button on the account page) flushes all three namespaces at once.
+
+| Namespace | Data | Redis TTL |
+|---|---|---|
+| `opira:lookups:*` | Statuses, types, priorities, roles, time-entry activities, schemas, custom field options | 7–30 days |
+| `opira:sprints:*` | Versions / sprints per project | 30 min (invalidated on version mutations) |
+| `opira:perms:*` | Effective permissions per user | 1 day (invalidated on sign-out / refresh) |
+| `opira:assignees:*` | Available assignees per project | 15 min (invalidated on membership mutations) |
+| `opira:categories:*` | Categories per project | 1 day (invalidated on category mutations) |
 
 ---
 
@@ -300,6 +308,17 @@ Tests in `lib/data/**/*.test.js` assert API and DB repos produce identical UI sh
 ## 📦 Performance
 
 ~170 MB compressed image, multi-stage alpine build, non-root. `console.log/info/debug` stripped in production.
+
+**Server-side caching** uses a three-tier hierarchy so cold-load API fan-out is minimal:
+
+```
+L0  TanStack Query       browser   staleTime 30 s (5 min for /users/me)
+L1  in-process Map       per pod   TTL varies, LRU max-200 eviction
+L2  Redis (optional)     shared    TTL varies, survives restarts / rolling deploys
+L3  OpenProject API      source    always authoritative
+```
+
+A **singleflight** guard on the permissions loader coalesces the 6–8 parallel route-handler calls that fire on cold page load into a single OpenProject fan-out. Without Redis, the in-process cache still de-duplicates within a pod's lifetime.
 
 ---
 
