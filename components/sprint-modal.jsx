@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
+import { AiSuggestButton } from "@/components/ui/ai-suggest-button";
+import { usePublicConfig } from "@/components/config-provider";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
@@ -147,6 +149,7 @@ function CapacityPanel({ capacity, overCommitted }) {
 export function SprintModal({ sprint, tasks, projectId, onClose, onStarted }) {
   const update = useUpdateVersion(projectId);
   const [submitErr, setSubmitErr] = useState(null);
+  const { aiEnabled } = usePublicConfig();
 
   const {
     register,
@@ -300,6 +303,20 @@ export function SprintModal({ sprint, tasks, projectId, onClose, onStarted }) {
               rows={3}
               className={TEXTAREA}
             />
+            {aiEnabled && (
+              <AiSuggestButton
+                mode="sprint-goal"
+                label="Generate sprint goal"
+                variant="insert"
+                payload={{
+                  sprintName: sprint.name,
+                  taskTitles: (tasks || [])
+                    .filter((t) => t.sprint === sprint.id)
+                    .map((t) => t.title),
+                }}
+                onAccept={(text) => setValue("goal", text, { shouldValidate: true })}
+              />
+            )}
           </div>
         </div>
 

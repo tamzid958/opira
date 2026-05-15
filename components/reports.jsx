@@ -14,6 +14,7 @@ import { formatEstimate, sourceOf, weightOf } from "@/lib/openproject/estimate";
 import { ratioOf } from "@/lib/openproject/task-state";
 import { safeParseISO } from "@/lib/utils";
 import { usePublicConfig } from "@/components/config-provider";
+import { AiSuggestButton } from "@/components/ui/ai-suggest-button";
 
 const PAGE_SIZE_DEFAULT = 10;
 
@@ -1486,9 +1487,86 @@ function KpiRow({ projectId, sprint, sprintTasks, allTasks, velocity, unit = "pt
 // throughput) have the data they need, and derives the sprint-scoped
 // slice internally for the burndown / sprint-progress KPI.
 
+// ─── AI Reports Panel ────────────────────────────────────────────────────────
+
+function AiReportsPanel({ sprint, sprintTasks, velocity, burndownData }) {
+  const { aiEnabled } = usePublicConfig();
+
+  if (!aiEnabled || !sprint) return null;
+
+  const sprintName = sprint.name?.split(" — ")[0] || "Sprint";
+  const completedTasks = sprintTasks.filter((t) => t.statusIsClosed).map((t) => t.title);
+  const incompleteTasks = sprintTasks.filter((t) => !t.statusIsClosed).map((t) => t.title);
+  const completedPts = burndownData?.completed?.points ?? null;
+  const prevVelocity = velocity?.avg ?? null;
+
+  const points = burndownData?.points || [];
+  const lastPoint = points[points.length - 1];
+  const pointsLeft = lastPoint?.remaining ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+  const daysLeft = sprint.end && sprint.end !== "—"
+    ? Math.max(0, differenceInCalendarDays(parseISO(sprint.end), parseISO(today)))
+    : null;
+  const burnRate = points.length >= 2
+    ? Math.round(((points[0]?.remaining ?? 0) - (lastPoint?.remaining ?? 0)) / Math.max(1, points.length - 1) * 10) / 10
+    : null;
+  const idealLeft = daysLeft != null && burndownData?.committedAtStart
+    ? Math.round((burndownData.committedAtStart / Math.max(1, points.length + daysLeft)) * daysLeft)
+    : null;
+  const isAheadOfSchedule = idealLeft != null && pointsLeft != null ? pointsLeft <= idealLeft : null;
+
+  return (
+    <div className="rounded-xl border border-border bg-surface-elevated overflow-hidden">
+      <div className="px-4 py-3 border-b border-border-soft bg-surface-sunken flex items-center gap-2">
+        <span className="text-[13px] font-semibold text-fg">AI Reports</span>
+        <span className="text-[11px] text-fg-subtle">— powered by Ollama</span>
+      </div>
+      <div className="p-4 flex flex-col gap-2">
+        <AiSuggestButton
+          mode="retro"
+          label="Draft retrospective"
+          variant="copy"
+          payload={{
+            sprintName,
+            completed: completedTasks,
+            incomplete: incompleteTasks,
+            velocity: completedPts,
+            previousVelocity: prevVelocity,
+          }}
+        />
+        <AiSuggestButton
+          mode="stakeholder-report"
+          label="Write stakeholder update"
+          variant="copy"
+          payload={{
+            sprintName,
+            completed: completedTasks,
+            incomplete: incompleteTasks,
+            velocity: completedPts,
+            goal: sprint.goal || undefined,
+          }}
+        />
+        <AiSuggestButton
+          mode="trend-commentary"
+          label="Explain burndown trend"
+          variant="copy"
+          payload={{
+            sprintName,
+            burnRate,
+            daysLeft,
+            pointsLeft,
+            isAheadOfSchedule,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function Reports({ sprint, projectId, tasks = [] }) {
   const sprintTasks = sprint ? tasks.filter((t) => t.sprint === sprint.id) : [];
   const velocityQ = useVelocity(projectId, !!projectId);
+  const burndownQ = useBurndown(projectId, sprint?.id, !!projectId && !!sprint?.id);
   const velocity = velocityQ.data || { sprints: [], avg: 0 };
   // Project-wide mode + unit come from the velocity response (schema-
   // anchored server-side). Mode is what the client passes to every
@@ -1519,6 +1597,13 @@ export function Reports({ sprint, projectId, tasks = [] }) {
           sprint={sprint}
           sprintTasks={sprintTasks}
           mode={mode}
+        />
+
+        <AiReportsPanel
+          sprint={sprint}
+          sprintTasks={sprintTasks}
+          velocity={velocity}
+          burndownData={burndownQ.data}
         />
 
         <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">

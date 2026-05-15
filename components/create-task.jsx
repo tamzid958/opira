@@ -10,6 +10,7 @@ import { Menu } from "@/components/ui/menu";
 import { TagPill } from "@/components/ui/tag-pill";
 import { Icon, PriorityIcon, TypeIcon } from "@/components/icons";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { AiSuggestButton } from "@/components/ui/ai-suggest-button";
 import { TShirtPicker } from "@/components/tshirt-picker";
 import { PEOPLE } from "@/lib/data";
 import { useCustomOptions, useWpSchema } from "@/lib/hooks/use-openproject-detail";
@@ -127,6 +128,8 @@ export function CreateTask({
   onCreate,
   defaultSprint = null,
   defaultStatus = null,
+  defaultParent = null,
+  defaultParentName = null,
   projectName = "Project",
   projectId = null,
   categories = [],
@@ -165,7 +168,7 @@ export function CreateTask({
       points: null,
       sprint: defaultSprint,
       status: defaultStatus,
-      epic: null,
+      epic: defaultParent,
       labels: [],
     },
   });
@@ -173,6 +176,7 @@ export function CreateTask({
   const type = useWatch({ control, name: "type" });
   const assignee = useWatch({ control, name: "assignee" });
   const priority = useWatch({ control, name: "priority" });
+  const watchedTitle = useWatch({ control, name: "title" });
 
   const points = useWatch({ control, name: "points" });
   const pointsHref = useWatch({ control, name: "pointsHref" });
@@ -195,7 +199,7 @@ export function CreateTask({
     setValue("sprint", defaultSprint);
   }, [defaultSprint, sprint, setValue]);
   const epicId = useWatch({ control, name: "epic" });
-  const [parentName, setParentName] = useState(null);
+  const [parentName, setParentName] = useState(defaultParentName);
 
   // Derive a story-points schema from any task whose type matches — its
   // schemaHref tells us whether SP is a CustomOption (t-shirt sizes) or
@@ -211,7 +215,7 @@ export function CreateTask({
     );
   })();
   const schemaQ = useWpSchema(schemaHref);
-  const { storyPointsField } = usePublicConfig();
+  const { storyPointsField, aiEnabled } = usePublicConfig();
   const spField = schemaQ.data?.fields?.[storyPointsField];
   const spIsCustomOption = spField?.type === "CustomOption";
   const spOptionsQ = useCustomOptions(
@@ -333,20 +337,58 @@ export function CreateTask({
           {errors.title && (
             <div className="text-pri-highest text-[12px] mt-1">{errors.title.message}</div>
           )}
+          {aiEnabled && (
+            <AiSuggestButton
+              mode="title"
+              label="Improve title"
+              variant="insert"
+              payload={{
+                title: watchedTitle,
+                parentTitle: parentName || undefined,
+              }}
+              onAccept={(t) => setValue("title", t, { shouldValidate: true })}
+              disabled={!watchedTitle?.trim()}
+            />
+          )}
 
           {/* Description */}
           <div className="mt-3">
             <Controller
               control={control}
               name="description"
-              render={({ field }) => (
-                <RichTextEditor
-                  value={field.value || ""}
-                  onChange={field.onChange}
-                  placeholder="Add context, acceptance criteria, or links… (optional)"
-                  minHeight={140}
-                />
-              )}
+              render={({ field }) => {
+                const parentEpic = epicId
+                  ? (epics || []).find(
+                      (e) =>
+                        String(e.id) === String(epicId) ||
+                        String(e.nativeId) === String(epicId)
+                    )
+                  : null;
+                return (
+                  <>
+                    <RichTextEditor
+                      value={field.value || ""}
+                      onChange={field.onChange}
+                      placeholder="Add context, acceptance criteria, or links… (optional)"
+                      minHeight={140}
+                    />
+                    {aiEnabled && (
+                      <AiSuggestButton
+                        mode="description"
+                        label="Suggest description"
+                        payload={{
+                          title: watchedTitle,
+                          description: field.value || "",
+                          parentTitle: parentEpic?.title || parentName || undefined,
+                          parentDescription: parentEpic?.descriptionHtml || undefined,
+                        }}
+                        onAccept={(html) => field.onChange(html)}
+                        disabled={!watchedTitle?.trim()}
+                      />
+                    )}
+                  </>
+                );
+              }}
             />
           </div>
 

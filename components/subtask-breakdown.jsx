@@ -1,13 +1,10 @@
 "use client";
 
 import { useCallback, useImperativeHandle, useState } from "react";
-import { toast } from "sonner";
-import { friendlyError } from "@/lib/api-client";
 import { Avatar } from "@/components/ui/avatar";
 import { TaskStatusPill } from "@/components/ui/task-meta";
 import { Menu } from "@/components/ui/menu";
-import { Icon } from "@/components/icons";
-import { useCreateChild } from "@/lib/hooks/use-openproject-detail";
+import { Icon, TypeIcon } from "@/components/icons";
 import { useUpdateTask } from "@/lib/hooks/use-openproject";
 import { buildChildIndex as buildSliceChildIndex } from "@/lib/openproject/hierarchy";
 import { assigneeMenuItems, statusMenuItems } from "@/lib/openproject/menu-items";
@@ -54,7 +51,7 @@ function SubtaskRow({
   return (
     <>
       <div
-        className="grid grid-cols-[16px_100px_minmax(0,1fr)_100px_minmax(80px,140px)_28px_28px] gap-2 items-center -mx-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-subtle transition-colors"
+        className="grid grid-cols-[16px_18px_100px_minmax(0,1fr)_100px_minmax(80px,140px)_28px_28px] gap-2 items-center -mx-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-subtle transition-colors"
         style={{ paddingLeft: 8 + depth * 20 }}
       >
         <span
@@ -71,6 +68,10 @@ function SubtaskRow({
           }`}
         >
           <Icon name={expanded ? "chev-down" : "chev-right"} size={12} aria-hidden="true" />
+        </span>
+
+        <span className="grid place-items-center" title={task.typeName || "Task"}>
+          <TypeIcon name={task.typeName} color={task.typeColor} size={13} />
         </span>
 
         <span className="font-mono text-[11px] text-fg-subtle truncate">{task.key}</span>
@@ -271,19 +272,15 @@ export function SubtaskBreakdown({
   onBulkSetType,
   onBulkSetParent,
   onBulkDelete,
+  onOpenCreate,
   ref,
 }) {
-  const [adding, setAdding] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newTypeId, setNewTypeId] = useState(null);
-  const [typePickerAnchor, setTypePickerAnchor] = useState(null);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(() => new Set());
   const [bulkMoveMenu, setBulkMoveMenu] = useState(null);
   const [bulkAssignMenu, setBulkAssignMenu] = useState(null);
   const [bulkTypeMenu, setBulkTypeMenu] = useState(null);
   const [bulkParentAnchor, setBulkParentAnchor] = useState(null);
-  const createChild = useCreateChild(parent.nativeId);
 
   const clearSelection = useCallback(() => setSelected(new Set()), []);
   const toggleSelected = useCallback((id) => {
@@ -295,8 +292,10 @@ export function SubtaskBreakdown({
     });
   }, []);
 
+  const openCreate = useCallback(() => onOpenCreate?.(parent), [onOpenCreate, parent]);
+
   useImperativeHandle(ref, () => ({
-    startAdd: () => setAdding(true),
+    startAdd: openCreate,
   }));
 
   const childIndex = buildChildIndex(allTasks);
@@ -326,33 +325,6 @@ export function SubtaskBreakdown({
   const totalPts = subtree.reduce((s, t) => s + weightOf(t), 0);
   const donePts = subtree.reduce((s, t) => s + weightOf(t) * ratioOf(t), 0);
 
-  const resolvedTypeId = newTypeId ?? types[0]?.id ?? null;
-  const resolvedTypeName =
-    types.find((t) => String(t.id) === String(resolvedTypeId))?.name ||
-    types[0]?.name ||
-    "Task";
-
-  const addSub = async () => {
-    if (!newTitle.trim()) {
-      setAdding(false);
-      return;
-    }
-    try {
-      await createChild.mutateAsync({
-        title: newTitle.trim(),
-        projectId,
-        ...(resolvedTypeId != null ? { typeId: resolvedTypeId } : {}),
-      });
-      onChange?.("Sub-task added");
-      setPage(Math.max(1, Math.ceil((directChildren.length + 1) / PAGE_SIZE)));
-    } catch (e) {
-      toast.error(friendlyError(e, "Couldn't create sub-task — please try again."));
-    }
-    setNewTitle("");
-    setNewTypeId(null);
-    setAdding(false);
-  };
-
   return (
     <section>
       <header className="flex items-center justify-between gap-2 mb-2">
@@ -367,7 +339,7 @@ export function SubtaskBreakdown({
         {canCreate ? (
           <button
             type="button"
-            onClick={() => setAdding(true)}
+            onClick={openCreate}
             aria-label="Add sub-task"
             className="inline-flex items-center gap-1.5 h-6.5 px-2.5 rounded-md text-xs font-medium text-fg-muted hover:bg-surface-subtle hover:text-fg cursor-pointer"
           >
@@ -453,66 +425,7 @@ export function SubtaskBreakdown({
         </div>
       )}
 
-      {adding && canCreate && (
-        <div className="flex items-center gap-2 -mx-2 mt-1 px-2 py-2 rounded-md bg-surface-subtle">
-          <Icon name="plus" size={14} className="text-fg-subtle flex-shrink-0" aria-hidden="true" />
-          {types.length > 0 && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => setTypePickerAnchor(e.currentTarget.getBoundingClientRect())}
-                className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-[11px] font-medium bg-surface-muted hover:bg-surface text-fg-muted hover:text-fg border border-border flex-shrink-0 cursor-pointer transition-colors"
-                title="Choose work package type"
-              >
-                <Icon name="epic" size={10} aria-hidden="true" />
-                <span>{resolvedTypeName}</span>
-                <Icon name="chev-down" size={9} aria-hidden="true" className="text-fg-faint" />
-              </button>
-              {typePickerAnchor && (
-                <Menu
-                  anchorRect={typePickerAnchor}
-                  onClose={() => setTypePickerAnchor(null)}
-                  onSelect={(it) => {
-                    setNewTypeId(it.value);
-                    setTypePickerAnchor(null);
-                  }}
-                  width={180}
-                  items={types.map((t) => ({
-                    label: t.name,
-                    value: t.id,
-                    active: String(t.id) === String(resolvedTypeId),
-                  }))}
-                />
-              )}
-            </>
-          )}
-          <input
-            autoFocus
-            placeholder="Sub-task title…"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addSub();
-              if (e.key === "Escape") {
-                setAdding(false);
-                setNewTitle("");
-                setNewTypeId(null);
-              }
-            }}
-            onBlur={(e) => {
-              // Don't submit if focus moved to the type picker menu
-              if (typePickerAnchor) return;
-              addSub();
-            }}
-            className="flex-1 bg-transparent border-0 outline-none text-[13px] text-fg h-6 placeholder:text-fg-faint min-w-0"
-          />
-          {createChild.isPending && (
-            <span className="text-[11px] text-fg-faint flex-shrink-0">creating…</span>
-          )}
-        </div>
-      )}
-
-      {!adding && directChildren.length === 0 && (
+      {directChildren.length === 0 && (
         <div className="text-center py-4 px-4 text-[13px] text-fg-subtle border border-dashed border-border rounded-lg mt-1">
           No sub-tasks yet. Break this down to track progress and split work across the team.
         </div>

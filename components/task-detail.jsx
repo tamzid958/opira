@@ -36,6 +36,7 @@ import {
   RichTextEditor,
   isHtmlEmpty,
 } from "@/components/ui/rich-text-editor";
+import { AiSuggestButton } from "@/components/ui/ai-suggest-button";
 import { PEOPLE } from "@/lib/data";
 import {
   useActivities,
@@ -241,6 +242,7 @@ export function TaskDetail({
   onSubtaskBulkSetType,
   onSubtaskBulkSetParent,
   onSubtaskBulkDelete,
+  onCreateSubtask,
 }) {
   const task = tasks.find((t) => t.id === taskId);
   const wpId = task?.nativeId;
@@ -302,7 +304,7 @@ export function TaskDetail({
   // native numeric `storyPoints` or a custom-field key like `customField7`
   // for t-shirt sizing. Read from runtime config so the same build works
   // across environments.
-  const { storyPointsField } = usePublicConfig();
+  const { storyPointsField, aiEnabled } = usePublicConfig();
   const spField = schemaQ.data?.fields?.[storyPointsField];
   const spIsCustomOption = spField?.type === "CustomOption";
   const spOptionsQ = useCustomOptions(spField?.allowedValuesHref, !!spField?.allowedValuesHref);
@@ -338,6 +340,14 @@ export function TaskDetail({
   // `epic` (parent native id). No lookup against a static EPICS list.
   const epicNativeId = task.epic ? String(task.epic) : null;
   const epicLabel = task.epicName || null;
+
+  // AI assist context: parent task description + child task titles.
+  const aiParentTask = task.epic
+    ? (tasks || []).find((t) => String(t.nativeId) === String(task.epic))
+    : null;
+  const aiChildTitles = (tasks || [])
+    .filter((t) => String(t.epic) === String(task.nativeId))
+    .map((t) => t.title);
 
   const perm = task.permissions || {};
   const canEdit = perm.update !== false;
@@ -486,32 +496,49 @@ export function TaskDetail({
           </div>
 
           {editingTitle ? (
-            <textarea
-              autoFocus
-              className="block w-full font-display text-[24px] font-semibold tracking-[-0.022em] leading-[1.25] text-fg bg-surface-elevated border-2 border-accent rounded-md px-2 py-1 mb-4 outline-none shadow-[0_0_0_3px_var(--accent-100)] resize-none"
-              value={titleVal}
-              rows={2}
-              onChange={(e) => setTitleVal(e.target.value)}
-              onBlur={() => {
-                setEditingTitle(false);
-                if (titleVal.trim() && titleVal !== task.title) {
-                  onUpdate(task.id, { title: titleVal.trim() });
-                  onChange?.("Title updated");
-                } else {
-                  setTitleVal(task.title);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  e.target.blur();
-                }
-                if (e.key === "Escape") {
-                  setTitleVal(task.title);
+            <>
+              <textarea
+                autoFocus
+                className="block w-full font-display text-[24px] font-semibold tracking-[-0.022em] leading-[1.25] text-fg bg-surface-elevated border-2 border-accent rounded-md px-2 py-1 outline-none shadow-[0_0_0_3px_var(--accent-100)] resize-none"
+                value={titleVal}
+                rows={2}
+                onChange={(e) => setTitleVal(e.target.value)}
+                onBlur={() => {
                   setEditingTitle(false);
-                }
-              }}
-            />
+                  if (titleVal.trim() && titleVal !== task.title) {
+                    onUpdate(task.id, { title: titleVal.trim() });
+                    onChange?.("Title updated");
+                  } else {
+                    setTitleVal(task.title);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    e.target.blur();
+                  }
+                  if (e.key === "Escape") {
+                    setTitleVal(task.title);
+                    setEditingTitle(false);
+                  }
+                }}
+              />
+              {aiEnabled && (
+                <AiSuggestButton
+                  mode="title"
+                  label="Improve title"
+                  variant="insert"
+                  payload={{
+                    title: titleVal,
+                    parentTitle: epicLabel || undefined,
+                    description: task.descriptionHtml || task.description || "",
+                  }}
+                  onAccept={(t) => setTitleVal(t)}
+                  disabled={!titleVal?.trim()}
+                  className="mb-3"
+                />
+              )}
+            </>
           ) : (
             <h2
               className={cn(
@@ -584,6 +611,20 @@ export function TaskDetail({
                   autoFocus
                   mentionUsers={mentionUsers}
                 />
+                {aiEnabled && (
+                  <AiSuggestButton
+                    mode="description"
+                    label="Suggest description"
+                    payload={{
+                      title: task.title,
+                      description: descVal,
+                      parentTitle: epicLabel || undefined,
+                      parentDescription: aiParentTask?.descriptionHtml || undefined,
+                      childTitles: aiChildTitles.length ? aiChildTitles : undefined,
+                    }}
+                    onAccept={(html) => setDescVal(html)}
+                  />
+                )}
                 <div className="flex justify-end gap-1.5 mt-2">
                   <button
                     type="button"
@@ -638,6 +679,43 @@ export function TaskDetail({
             )}
           </section>
 
+          {/* AI tools — acceptance criteria & subtask suggestions */}
+          {aiEnabled && canEdit && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              <AiSuggestButton
+                mode="acceptance-criteria"
+                label="Suggest acceptance criteria"
+                variant="append"
+                acceptLabel="Append to description"
+                payload={{
+                  title: task.title,
+                  description: task.descriptionHtml || task.description || "",
+                  parentTitle: epicLabel || undefined,
+                }}
+                onAccept={(html) => {
+                  setDescVal((prev) => (prev ? prev + html : html));
+                  setEditingDesc(false);
+                  onUpdate(task.id, {
+                    description: (task.descriptionHtml || task.description || "") + html,
+                    descriptionHtml: (task.descriptionHtml || task.description || "") + html,
+                  });
+                }}
+              />
+              <AiSuggestButton
+                mode="subtasks"
+                label="Suggest subtasks"
+                variant="accept"
+                acceptLabel="Open add form"
+                payload={{
+                  title: task.title,
+                  description: task.descriptionHtml || task.description || "",
+                  parentTitle: epicLabel || undefined,
+                }}
+                onAccept={() => subtaskRef.current?.startAdd()}
+              />
+            </div>
+          )}
+
           {/* Sub-tasks */}
           <section className="mb-6">
             <SubtaskBreakdown
@@ -659,6 +737,7 @@ export function TaskDetail({
               onBulkSetType={onSubtaskBulkSetType}
               onBulkSetParent={onSubtaskBulkSetParent}
               onBulkDelete={onSubtaskBulkDelete}
+              onOpenCreate={onCreateSubtask}
             />
           </section>
 
@@ -760,14 +839,30 @@ export function TaskDetail({
                         control={control}
                         name="comment"
                         render={({ field }) => (
-                          <RichTextEditor
-                            value={field.value || ""}
-                            onChange={field.onChange}
-                            placeholder="Add a comment…"
-                            minHeight={64}
-                            onSubmit={onSubmitComment}
-                            mentionUsers={mentionUsers}
-                          />
+                          <>
+                            <RichTextEditor
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                              placeholder="Add a comment…"
+                              minHeight={64}
+                              onSubmit={onSubmitComment}
+                              mentionUsers={mentionUsers}
+                            />
+                            {aiEnabled && (
+                              <AiSuggestButton
+                                mode="comment"
+                                label="Draft with AI"
+                                variant="insert"
+                                payload={{
+                                  title: task.title,
+                                  description: task.descriptionHtml || task.description || "",
+                                  parentTitle: epicLabel || undefined,
+                                  existingComment: field.value || "",
+                                }}
+                                onAccept={(html) => field.onChange(html)}
+                              />
+                            )}
+                          </>
                         )}
                       />
                       <div className="flex items-center gap-1 mt-1.5 text-fg-subtle">

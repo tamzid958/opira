@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Icon } from "@/components/icons";
@@ -103,6 +103,8 @@ export function RichTextEditor({
     return base;
   }, [mentionsEnabled]);
 
+  const [isEmpty, setIsEmpty] = useState(!value);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions,
@@ -127,18 +129,21 @@ export function RichTextEditor({
       // Tiptap returns "<p></p>" for an empty doc. Normalise that to an
       // empty string so downstream "is the body empty?" checks behave.
       const html = ed.isEmpty ? "" : ed.getHTML();
+      setIsEmpty(ed.isEmpty);
       onChange?.(html);
     },
   });
 
   // Keep editor content in sync when the parent resets `value` (e.g. the
-  // comment textarea clears after submit). Skip when the parent is just
-  // echoing what we emitted to avoid a re-render loop.
+  // comment textarea clears after submit, or AI suggestion is accepted).
+  // Skip when the parent is just echoing what we emitted to avoid a loop.
   useEffect(() => {
     if (!editor) return;
     const cur = editor.getHTML();
     if (value !== cur && !(editor.isEmpty && (value === "" || value == null))) {
       editor.commands.setContent(value || "", { emitUpdate: false });
+      // Schedule isEmpty update outside the effect body to avoid cascading renders.
+      queueMicrotask(() => setIsEmpty(editor.isEmpty));
     }
   }, [value, editor]);
 
@@ -317,7 +322,7 @@ export function RichTextEditor({
         data-placeholder={placeholder}
       >
         <EditorContent editor={editor} />
-        {editor.isEmpty && (
+        {isEmpty && (
           <span
             className="pointer-events-none absolute top-2.5 left-3 text-[13px] text-fg-faint"
             aria-hidden="true"

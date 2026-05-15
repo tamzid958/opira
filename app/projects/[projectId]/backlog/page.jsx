@@ -1032,7 +1032,8 @@ export default function BacklogPage({ params: paramsPromise }) {
               }
             }}
             projectId={projectId}
-            onCreate={() => setParams({ create: "1" })}
+            onCreate={(sprintId) => setParams({ create: "1", createSprint: sprintId || null })}
+            onUpdateDescription={(id, html) => updateTask(id, { description: html, descriptionHtml: html })}
           />
       </div>
 

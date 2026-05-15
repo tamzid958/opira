@@ -17,7 +17,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blueviolet.svg)](./CONTRIBUTING.md)
 [![Made with ♥ by Tamzid](https://img.shields.io/badge/made_by-Tamzid_Ahmed-ec4899.svg)](https://github.com/tamzid958)
 
-[Quick Start](#-quick-start) · [Docker](#-docker) · [Configuration](#-configuration) · [Data sources](#-data-sources) · [Architecture](#-architecture) · [Contributing](#-contributing)
+[Quick Start](#-quick-start) · [Docker](#-docker) · [Configuration](#-configuration) · [Data sources](#-data-sources) · [AI Assist](#-ai-assist) · [Architecture](#-architecture) · [Contributing](#-contributing)
 
 </div>
 
@@ -79,6 +79,7 @@ OpenProject is a powerful, open-source project-management server. Its UI is comp
 - ✅ **Optimistic updates with rollback** — the UI never lies to you
 - ✅ **In-app upgrade banner** — signed-in users see when a new release is available
 - ✅ **Planning poker** (t-shirt) — live multi-player voting room per work package, optional Redis backend for multi-pod fan-out
+- ✅ **AI assist (12 integration points)** — optional Ollama-powered suggestions across task create, task detail, sprint planning, milestone tracking, backlog grooming, and reports; context-aware prompts, DOMPurify-sanitised output, copy/insert/accept/append action variants
 
 </details>
 
@@ -171,8 +172,11 @@ docker compose up -d --build
 | `HOURS_PER_POINT` | optional | Hours-per-point for the capacity view (default `4`). |
 | `OPIRA_TEST_DB_URL` | optional | Connection string used by the schema canary + DB integration tests (skipped when unset). |
 | `OPIRA_REDIS_URL` | optional | Redis connection string. Used for two things: **lookup caching** (statuses, types, priorities, schemas, t-shirt options — 30–60 min TTL, shared across pods) and **planning-poker** rooms (30-min idle TTL, pub/sub fan-out). Unset → both fall back to in-process Maps. Server-only. |
+| `OLLAMA_BASE_URL` | optional | Enables the **AI assist** feature. Set to `http://localhost:11434` for a local Ollama install, or `https://ollama.com` for Ollama Cloud. When unset all AI buttons are hidden. Server-only. |
+| `OLLAMA_API_KEY` | optional | API key for Ollama Cloud (`ollama.com/settings/keys`). Not required for a local Ollama instance. Server-only — never commit a real value. |
+| `OLLAMA_MODEL` | optional | Ollama model name. For local Ollama, the first available local model is used when this is unset; for Ollama Cloud a model name is required. |
 
-All env vars are read at request time on the server. Values the client needs (`OPENPROJECT_URL`, `OPENPROJECT_STORY_POINTS_FIELD`, `OPENPROJECT_WORKING_DAYS`, plus a read-only `dataSource` indicator) are surfaced through React context — no `NEXT_PUBLIC_*` baking, no rebuild to change envs. Server-only secrets (`AUTH_SECRET`, OAuth client secret, `OPENPROJECT_DB_URL`) **never reach the browser**.
+All env vars are read at request time on the server. Values the client needs (`OPENPROJECT_URL`, `OPENPROJECT_STORY_POINTS_FIELD`, `OPENPROJECT_WORKING_DAYS`, plus read-only `dataSource` and `aiEnabled` indicators) are surfaced through React context — no `NEXT_PUBLIC_*` baking, no rebuild to change envs. Server-only secrets (`AUTH_SECRET`, OAuth client secret, `OPENPROJECT_DB_URL`) **never reach the browser**.
 
 ---
 
@@ -296,6 +300,85 @@ In-process caches drain naturally within 5 minutes after the DELETE.
 
 ---
 
+## ✨ AI assist
+
+Opira integrates [Ollama](https://ollama.com) (local or cloud) across **12 touch-points** to help with the writing-heavy parts of project management. Every button is **fully optional** — when `OLLAMA_BASE_URL` is not set nothing changes in any normal flow.
+
+### Where AI buttons appear
+
+| Location | What it generates | Action |
+|---|---|---|
+| Task create modal → **Title** | Alternative / improved title | Inserts immediately |
+| Task create modal → **Description** | Structured HTML description | Preview → Accept (replaces) |
+| Task detail → **Title** (edit mode) | Improved title | Inserts immediately |
+| Task detail → **Description** (edit mode) | Draft description from title + parent + children | Preview → Accept (replaces) |
+| Task detail → **Comment** box | Draft comment based on task context | Inserts immediately |
+| Task detail → **Acceptance criteria** | Testable criteria as bullet list | Preview → Append to description |
+| Task detail → **Sub-tasks** | Suggested breakdown titles | Preview → Open add-task form |
+| Sprint modal → **Sprint goal** | Goal based on sprint name + task list | Inserts immediately |
+| Complete-sprint modal → **Release notes** | Markdown-style release notes | Preview → Save to sprint description |
+| Milestones page → **Status update** | Stakeholder-ready status paragraph | Preview → Copy to clipboard |
+| Milestones page → **Risk identification** | Overdue / blocked risk summary | Preview → Copy to clipboard |
+| Backlog grooming panel → **Description** | Draft description for undescribed tasks | Preview → Save directly to task |
+| Reports page → **Sprint retrospective** | Start/stop/continue format | Preview → Copy to clipboard |
+| Reports page → **Stakeholder report** | Executive summary of sprint results | Preview → Copy to clipboard |
+| Reports page → **Trend commentary** | Velocity trend analysis | Preview → Copy to clipboard |
+
+### Action variants
+
+| Variant | User interaction |
+|---|---|
+| `insert` | No preview card — result fills the field immediately |
+| `accept` | Preview card → **Accept** replaces the current value, **Dismiss** discards |
+| `append` | Preview card → **Append** adds to existing content, **Dismiss** discards |
+| `copy` | Preview card → **Copy** copies plain text to clipboard, **Done** closes |
+
+### Setup — Local Ollama (no API key)
+
+```bash
+# 1. Install Ollama — https://ollama.com
+# 2. Pull a model
+ollama pull llama3.2
+
+# 3. Add to .env
+OLLAMA_BASE_URL=http://localhost:11434
+# OLLAMA_MODEL is optional — first available local model is used when unset
+```
+
+### Setup — Ollama Cloud (API key required)
+
+Create a key at [ollama.com/settings/keys](https://ollama.com/settings/keys), then:
+
+```bash
+OLLAMA_BASE_URL=https://ollama.com
+OLLAMA_API_KEY=<your key>
+OLLAMA_MODEL=llama3.2    # required for cloud — no free model auto-discovery
+```
+
+### How prompts are built
+
+Every mode combines available context before calling the model. All user-supplied fields (titles, descriptions, task names) are stripped of HTML tags, null bytes, and control characters before entering the prompt (**prompt-injection prevention**). Model output is sanitised with DOMPurify against a strict `<p>/<ul>/<ol>/<li>/<strong>/<em>/<br>` allowlist before reaching the editor or clipboard.
+
+| Context input | Limit |
+|---|---|
+| Task / sprint / milestone title | — |
+| Existing description (HTML-stripped) | 600 chars |
+| Parent task title + description (HTML-stripped) | 400 chars |
+| Child task titles | all |
+| Sprint task list, completed tasks, velocity stats | mode-dependent |
+
+### Error handling
+
+| Scenario | User sees |
+|---|---|
+| `OLLAMA_BASE_URL` not set | All AI buttons hidden — nothing changes |
+| Ollama not running / unreachable | Error chip: _"AI service unavailable — is Ollama running?"_ |
+| No local model available and no `OLLAMA_MODEL` set | Error chip: _"No Ollama model configured…"_ |
+| Model not pulled / subscription required | Error chip with Ollama's error message |
+| Request timeout (15 s) | Error chip: _"AI request timed out"_ |
+
+---
+
 ## 🔑 Register the OAuth client in OpenProject
 
 Once, in your OpenProject admin: **Administration → Authentication → OAuth applications → Add**.
@@ -381,6 +464,7 @@ opira/
 │  ├─ layout.jsx · page.jsx · {loading,error,not-found}.jsx
 │  ├─ projects/[projectId]/{board,backlog,timeline,reports,overview,tags,members,documents}/
 │  ├─ api/openproject/*                  authenticated proxy routes
+│  ├─ api/ai/suggest-description/        Ollama proxy — 13 prompt modes, DOMPurify-sanitised output
 │  ├─ api/health/data-source/            mode + latency probe
 │  ├─ api/updates/check/                 GitHub-release poll for the upgrade banner
 │  └─ account/page.jsx
@@ -446,6 +530,7 @@ The Vitest suite lives next to the data-layer code (`lib/data/**/*.test.js`) and
 - **Access tokens are server-side only.** OAuth bearer is injected in route handlers and never serialised to the client.
 - **Refresh tokens rotate** with a 60s buffer; rotation failures redirect to `/sign-in`.
 - **HTML user content** (descriptions, comments) is **always** sanitised with `isomorphic-dompurify` on render. Never `dangerouslySetInnerHTML` raw OpenProject HTML.
+- **AI prompt sanitization** — all user-supplied fields are stripped of HTML, null bytes, and control characters before entering any Ollama prompt. AI-generated HTML is sanitised with DOMPurify (strict tag allowlist) both server-side and client-side before being shown or persisted.
 - **Permissions** are read live from each resource's `_links`; never duplicated client-side.
 - **CSRF** handled via NextAuth signed session cookies + same-origin proxy routes.
 

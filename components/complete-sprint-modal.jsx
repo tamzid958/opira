@@ -11,6 +11,8 @@ import {
 import { useUpdateTask } from "@/lib/hooks/use-openproject";
 import { buildClosedStatusIdSet } from "@/lib/openproject/task-state";
 import { CreateSprintModal } from "@/components/create-sprint";
+import { AiSuggestButton } from "@/components/ui/ai-suggest-button";
+import { usePublicConfig } from "@/components/config-provider";
 import { formatEstimate, weightOf } from "@/lib/openproject/estimate";
 import { cn } from "@/lib/utils";
 
@@ -28,10 +30,12 @@ export function CompleteSprintModal({
   const [destination, setDestination] = useState("backlog");
   const [page, setPage] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
+  const [releaseNotesHtml, setReleaseNotesHtml] = useState("");
   const updateVersion = useUpdateVersion(projectId);
   const updateTask = useUpdateTask(projectId);
   const createVersion = useCreateVersion(projectId);
   const [busy, setBusy] = useState(false);
+  const { aiEnabled } = usePublicConfig();
 
   const closedStatusIds = buildClosedStatusIdSet(statuses);
 
@@ -109,7 +113,7 @@ export function CompleteSprintModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="bg-surface-elevated rounded-xl shadow-xl w-full max-w-lg p-4 sm:p-6 animate-slide-up"
+        className="bg-surface-elevated rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 animate-slide-up"
       >
         <h2 className="font-display text-[20px] font-semibold tracking-[-0.018em] text-fg m-0 mb-2">
           Complete {sprint.name.split(" — ")[0]}
@@ -236,6 +240,35 @@ export function CompleteSprintModal({
               : "Create new sprint…"}
           </button>
         </div>
+
+        {aiEnabled && (
+          <div className="mb-4">
+            <AiSuggestButton
+              mode="release-notes"
+              label="Generate release notes"
+              payload={{
+                sprintName: sprint.name?.split(" — ")[0] || sprint.name,
+                completedTasks: inSprint
+                  .filter((t) => !open.includes(t))
+                  .map((t) => t.title),
+              }}
+              onAccept={(html) => {
+              setReleaseNotesHtml(html);
+              const plain = html.replace(/<\/p>/gi, "\n").replace(/<\/li>/gi, "\n").replace(/<[^>]*>/g, "").replace(/\n{3,}/g, "\n\n").trim();
+              updateVersion.mutate({ id: sprint.id, description: plain });
+            }}
+            />
+            {releaseNotesHtml && (
+              <div className="mt-2 rounded-md border border-border bg-surface-subtle p-3">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-fg-subtle mb-2">Release notes</span>
+                <div
+                  className="op-html prose-comment text-[13px] leading-relaxed text-fg max-h-40 overflow-y-auto"
+                  dangerouslySetInnerHTML={{ __html: releaseNotesHtml }}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 mt-6">
           <button

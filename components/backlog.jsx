@@ -29,6 +29,8 @@ import { PEOPLE } from "@/lib/data";
 import { cn, findById, formatAbsDate } from "@/lib/utils";
 import { buildChildIndex, rootsOf } from "@/lib/openproject/hierarchy";
 import { assigneeMenuItems, statusMenuItems } from "@/lib/openproject/menu-items";
+import { AiSuggestButton } from "@/components/ui/ai-suggest-button";
+import { usePublicConfig } from "@/components/config-provider";
 
 // Backlog row column layout. Each column has a deliberate width so the
 // table reads cleanly on every screen width:
@@ -383,8 +385,6 @@ function BacklogSection({
   carryoverByWpId,
 }) {
   const [collapsed, setCollapsed] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
   const [expandedSet, setExpandedSet] = useState(() => new Set());
   const [sprintMenu, setSprintMenu] = useState(null);
   // Build the kebab in three groups (lifecycle / management / destructive)
@@ -456,13 +456,6 @@ function BacklogSection({
   const allSelected = tasks.length > 0 && tasks.every((t) => selected.has(t.id));
   const someSelected = tasks.some((t) => selected.has(t.id));
 
-  const submitAdd = () => {
-    if (newTitle.trim()) {
-      onCreate({ title: newTitle.trim(), sprint: sprint ? sprint.id : null });
-      setNewTitle("");
-    }
-    setAdding(false);
-  };
 
   // Progress for the section header sliver — done WP / total WP. Kept
   // separate from the points-based progress in the cards so the bar
@@ -668,38 +661,17 @@ function BacklogSection({
           />
           {canCreate ? (
             <div className="flex items-center gap-2 px-3 py-2 border-t border-border-soft">
-              {adding ? (
-                <>
-                  <Icon name="plus" size={14} className="text-fg-subtle" aria-hidden="true" />
-                  <input
-                    autoFocus
-                    placeholder="What needs to be done?"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") submitAdd();
-                      if (e.key === "Escape") {
-                        setAdding(false);
-                        setNewTitle("");
-                      }
-                    }}
-                    onBlur={submitAdd}
-                    className="flex-1 bg-transparent border-0 outline-none text-[13px] text-fg placeholder:text-fg-faint"
-                  />
-                </>
-              ) : (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setAdding(true)}
-                  onKeyDown={(e) =>
-                    (e.key === "Enter" || e.key === " ") && setAdding(true)
-                  }
-                  className="inline-flex items-center gap-1.5 px-2 h-7 rounded text-xs font-medium text-fg-subtle hover:bg-surface-subtle hover:text-fg cursor-pointer"
-                >
-                  <Icon name="plus" size={12} aria-hidden="true" /> Create issue
-                </span>
-              )}
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={() => onCreate(sprint?.id || null)}
+                onKeyDown={(e) =>
+                  (e.key === "Enter" || e.key === " ") && onCreate(sprint?.id || null)
+                }
+                className="inline-flex items-center gap-1.5 px-2 h-7 rounded text-xs font-medium text-fg-subtle hover:bg-surface-subtle hover:text-fg cursor-pointer"
+              >
+                <Icon name="plus" size={12} aria-hidden="true" /> Create issue
+              </span>
             </div>
           ) : null}
         </>
@@ -754,11 +726,78 @@ function BulkBarButton({ icon, label, onClick }) {
 }
 
 
+function BacklogGroomPanel({ tasks, onTaskClick, onUpdateDescription }) {
+  const { aiEnabled } = usePublicConfig();
+  const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState(new Set());
+
+  if (!aiEnabled) return null;
+
+  const undescribed = tasks.filter(
+    (t) => !t.descriptionHtml && !t.description && t.title?.trim() && !saved.has(t.id),
+  );
+
+  if (undescribed.length === 0 && !open) return null;
+
+  return (
+    <div className="mx-1 mb-3 rounded-lg border border-border bg-surface-elevated overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-fg-subtle hover:bg-surface-subtle transition-colors"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Icon name="epic" size={12} aria-hidden="true" />
+        <span className="font-medium text-fg">{undescribed.length} task{undescribed.length !== 1 ? "s" : ""} missing descriptions</span>
+        <span className="ml-auto text-[11px]">{open ? "Hide" : "Groom with AI"}</span>
+      </button>
+
+      {open && (
+        <div className="border-t border-border divide-y divide-border-soft">
+          {undescribed.slice(0, 10).map((t) => (
+            <div key={t.id} className="px-3 py-2.5">
+              <div className="flex items-center gap-2 mb-1.5">
+                <button
+                  type="button"
+                  className="text-[12.5px] font-medium text-fg hover:text-accent transition-colors text-left"
+                  onClick={() => onTaskClick?.(String(t.nativeId))}
+                >
+                  {t.title}
+                </button>
+                <span className="text-[10.5px] text-fg-faint font-mono shrink-0">{t.key}</span>
+              </div>
+              <AiSuggestButton
+                mode="backlog-groom"
+                label="Suggest description"
+                variant={onUpdateDescription ? "accept" : "copy"}
+                acceptLabel="Save description"
+                payload={{ title: t.title, description: "" }}
+                onAccept={(html) => {
+                  onUpdateDescription?.(t.id, html);
+                  setSaved((prev) => new Set([...prev, t.id]));
+                }}
+              />
+            </div>
+          ))}
+          {undescribed.length > 10 && (
+            <div className="px-3 py-2 text-[11px] text-fg-subtle">
+              +{undescribed.length - 10} more — open tasks individually to generate descriptions.
+            </div>
+          )}
+          {undescribed.length === 0 && (
+            <div className="px-3 py-2 text-[11px] text-fg-subtle">All tasks have descriptions.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Backlog({
   tasks,
   statuses,
   sprints,
   assignees,
+  onUpdateDescription,
   manageVersions = { allowed: true, loading: false },
   canCreate = true,
   currentUserId,
@@ -981,6 +1020,8 @@ export function Backlog({
       onDragCancel={() => setOverId(null)}
     >
       <div className="px-2 py-2 pb-20">
+        <BacklogGroomPanel tasks={tasks} onTaskClick={onTaskClick} onUpdateDescription={onUpdateDescription} />
+
         {totalUnassigned > 0 && (
           <div className="mx-1 mb-3 flex items-center gap-2 px-3 py-2 rounded-lg border border-tag-backend-bg bg-tag-backend-bg/40 text-[12px] text-tag-backend-fg">
             <Icon name="flag" size={12} aria-hidden="true" />

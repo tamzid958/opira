@@ -5,6 +5,8 @@ import { ChevronRight, Flag } from "lucide-react";
 import { TaskTypeIcon, TaskStatusPill } from "@/components/ui/task-meta";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AiSuggestButton } from "@/components/ui/ai-suggest-button";
+import { usePublicConfig } from "@/components/config-provider";
 import { cn, formatAbsDate, findById } from "@/lib/utils";
 import { PEOPLE } from "@/lib/data";
 
@@ -105,9 +107,16 @@ function ChildRow({ task, sprints, onClick }) {
 
 function MilestoneRow({ milestone, childTasks, sprints, onTaskClick }) {
   const [open, setOpen] = useState(true);
+  const { aiEnabled } = usePublicConfig();
   const sprint = sprintName(milestone, sprints);
   const childCount = childTasks.length;
   const closedCount = childTasks.filter((c) => c.statusIsClosed).length;
+  const overdueItems = childTasks
+    .filter((c) => !c.statusIsClosed && c.dueDate && c.dueDate < new Date().toISOString().slice(0, 10))
+    .map((c) => c.title);
+  const blockedItems = childTasks
+    .filter((c) => !c.statusIsClosed && c.statusName?.toLowerCase().includes("block"))
+    .map((c) => c.title);
 
   return (
     <>
@@ -190,6 +199,38 @@ function MilestoneRow({ milestone, childTasks, sprints, onTaskClick }) {
         <tr>
           <td colSpan={7} className="py-2 pl-10 text-[12px] text-fg-subtle italic">
             No child issues
+          </td>
+        </tr>
+      )}
+
+      {aiEnabled && (
+        <tr>
+          <td colSpan={7} className="pb-3 pl-10 pr-3">
+            <div className="flex flex-wrap gap-2 mt-1">
+              <AiSuggestButton
+                mode="milestone-status"
+                label="Draft status update"
+                variant="copy"
+                payload={{
+                  milestoneTitle: milestone.title,
+                  dueDate: milestone.dueDate || undefined,
+                  percentDone: milestone.percentageDone ?? undefined,
+                  childSummary: `${closedCount} of ${childCount} tasks complete`,
+                }}
+              />
+              <AiSuggestButton
+                mode="milestone-risk"
+                label="Identify risks"
+                variant="copy"
+                payload={{
+                  milestoneTitle: milestone.title,
+                  dueDate: milestone.dueDate || undefined,
+                  percentDone: milestone.percentageDone ?? undefined,
+                  overdueItems,
+                  blockedItems,
+                }}
+              />
+            </div>
           </td>
         </tr>
       )}

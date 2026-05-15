@@ -67,6 +67,8 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
     urlParams.get("createSprint") ||
     pickSprintByDate(sprintsQ.data || [])?.id ||
     null;
+  const createDefaultParent = urlParams.get("createParent") || null;
+  const createDefaultParentName = urlParams.get("createParentName") || null;
   const tasksQ = useTasks(projectId, configured && !!projectId);
   const statusesQ = useStatuses(configured);
   const typesQ = useTypes(projectId, configured && !!projectId);
@@ -188,7 +190,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
 
   const closeWp = useCallback(() => setParams({ wp: null }), [setParams]);
   const closeCreate = useCallback(
-    () => setParams({ create: null, createSprint: null, createStatus: null }),
+    () => setParams({ create: null, createSprint: null, createStatus: null, createParent: null, createParentName: null }),
     [setParams],
   );
 
@@ -377,6 +379,13 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
           onSubtaskBulkSetType={subtaskBulkSetType}
           onSubtaskBulkSetParent={subtaskBulkSetParent}
           onSubtaskBulkDelete={subtaskBulkDelete}
+          onCreateSubtask={(parent) =>
+            setParams({
+              create: "1",
+              createParent: String(parent.nativeId),
+              createParentName: parent.title || null,
+            })
+          }
         />
       )}
       {createOpen && (
@@ -387,6 +396,8 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
           projectId={projectId}
           defaultSprint={createDefaultSprint}
           defaultStatus={createDefaultStatus}
+          defaultParent={createDefaultParent}
+          defaultParentName={createDefaultParentName}
           categories={categoriesQ.data || []}
           types={typesQ.data || []}
           priorities={prioritiesQ.data || []}
