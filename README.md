@@ -25,63 +25,38 @@
 
 ## 🚀 Why Opira
 
-OpenProject is a powerful, open-source project-management server. Its UI is comprehensive — and that is precisely the problem. Teams arriving from Jira, Linear, or Shortcut find the screens dense, the shortcuts sparse, and the daily flows (board → backlog → review) more clicks than they should be.
+OpenProject is a powerful, open-source project-management server. Its UI is comprehensive — and that is precisely the problem. Teams arriving from Jira, Linear, or Shortcut find the screens dense, the shortcuts sparse, and the daily flows more clicks than they should be.
 
 **Opira fixes the front-end without forking the back-end.**
 
 | | Stock OpenProject UI | **Opira** |
 |---|---|---|
-| Sprint board | Generic board macro | Per-sprint kanban, **drag-and-drop**, swimlanes |
-| Backlog | Work-package list | Sprint-grouped, **bulk move/assign/delete**, sub-task expansion |
-| Sprints | Versions screen | Native lifecycle (`open` → `locked` → `closed`) with full modals |
-| Reports | External plugin | **Burndown + velocity + capacity** built-in |
-| Search | Page-level filters | **⌘K command palette** across projects, work packages, people |
-| Permissions | Role-name guesswork | Driven by **live `_links` from each resource** |
-| Read path | API only | **API or DB-direct** (hybrid mode), same UI shapes |
-| Stack | Rails + ERB | **Next.js 16 · React 19 · Tailwind v4** |
-| Lock-in | None — Opira is just a different lens on the same API | |
+| Sprint board | Generic board macro | Per-sprint kanban, drag-and-drop, swimlanes |
+| Backlog | Work-package list | Sprint-grouped, bulk move/assign/delete, sub-task expansion |
+| Sprints | Versions screen | Native lifecycle with full modals |
+| Reports | External plugin | Burndown + velocity + capacity built-in |
+| Search | Page-level filters | ⌘K command palette |
+| Permissions | Role-name guesswork | Driven by live `_links` from each resource |
+| Read path | API only | API or DB-direct (hybrid mode) |
+| Stack | Rails + ERB | Next.js 16 · React 19 · Tailwind v4 |
 
-> **Front-end only.** Bring your own OpenProject server (self-hosted Community Edition runs in one `docker run`).
+> **Front-end only.** Bring your own OpenProject server. Self-hosted Community Edition runs in one `docker run`.
 
 ---
 
-## 🎯 Feature matrix
+## 🎯 Features
 
-<details open>
-<summary><strong>Planning & execution</strong></summary>
-
-- ✅ **Drag-and-drop sprint board** — status-aware columns, swimlanes, search/assignee/type/tag/status filters
-- ✅ **Backlog** with bulk move/assign/delete + sub-task expansion
-- ✅ **One-click sprint sync** — align dates, roll up story points
-- ✅ Sprint lifecycle: create · edit · start · complete · lock · unlock · reopen
-- ✅ **Timeline** view with sprint-grouped date bands
-- ✅ **JSON import** — drop a tree of work packages into a sprint
-
-</details>
-
-<details open>
-<summary><strong>Visibility & reporting</strong></summary>
-
-- ✅ **Burndown** + **velocity** + **capacity** per sprint
-- ✅ **Documents reader** — two-pane, embedded attachments proxied so they actually render
-- ✅ Activity feed, watchers, file links, time entries, revisions, relations
-
-</details>
-
-<details open>
-<summary><strong>Collaboration & QoL</strong></summary>
-
-- ✅ **⌘K / Ctrl-K command palette** across projects, work packages, members
-- ✅ **Tiptap rich text** with @-mentions; sanitised on render
-- ✅ **Permission-aware UI** — every action button reflects the resource's live `_links`
-- ✅ **Notifications**, **members**, **tags**, **reminders**, **shortcuts** modal
-- ✅ **Offline queue** — mutations replay on reconnect
-- ✅ **Optimistic updates with rollback** — the UI never lies to you
-- ✅ **In-app upgrade banner** — signed-in users see when a new release is available
-- ✅ **Planning poker** (t-shirt) — live multi-player voting room per work package, optional Redis backend for multi-pod fan-out
-- ✅ **AI assist (12 integration points)** — optional Ollama-powered suggestions across task create, task detail, sprint planning, milestone tracking, backlog grooming, and reports; context-aware prompts, DOMPurify-sanitised output, copy/insert/accept/append action variants
-
-</details>
+- **Drag-and-drop sprint board** — status columns, swimlanes, search/assignee/type/tag/status filters
+- **Backlog** with bulk move/assign/delete + sub-task tree expansion
+- **Sprint lifecycle** — create, edit, start, complete, lock, unlock, reopen
+- **Reports** — burndown, velocity, capacity per sprint
+- **Timeline** view with sprint-grouped date bands
+- **⌘K command palette** — search projects, work packages, members
+- **Planning poker** — live multi-player t-shirt voting per work package
+- **AI assist** — optional Ollama-powered suggestions across 12 integration points
+- **Offline queue** — mutations replay on reconnect
+- **In-app upgrade banner** — signed-in users see when a new release is available
+- **JSON import** — drop a tree of work packages into a sprint
 
 ---
 
@@ -93,7 +68,7 @@ OpenProject is a powerful, open-source project-management server. Its UI is comp
   <img src="./docs/screenshots/sign-in.png" alt="Opira sign-in — Plan, ship, repeat. Your OpenProject, refined." width="100%" />
 </a>
 
-<sub><strong>Sign-in.</strong> OAuth 2.0 + PKCE against your OpenProject instance — the access token never reaches the browser.</sub>
+<sub>OAuth 2.0 + PKCE — the access token never reaches the browser.</sub>
 
 </div>
 
@@ -101,49 +76,37 @@ OpenProject is a powerful, open-source project-management server. Its UI is comp
 
 ## ⚡ Quick start
 
-> Node **22+**, npm 10+, and a reachable OpenProject **v3** instance you can sign in to as an administrator (to register the OAuth app).
+> Node 22+, npm 10+, and an OpenProject v3 instance with admin access for OAuth registration.
 
 ```bash
 git clone https://github.com/tamzid958/opira.git && cd opira
 npm install
-cp .env.local.example .env.local && $EDITOR .env.local      # fill in the four required values
+cp .env.local.example .env.local && $EDITOR .env.local
 npm run dev
 ```
 
-Open <http://localhost:3000>. The first request bounces through OpenProject for OAuth sign-in.
-
-> 💡 No OpenProject server handy? `docker run -d -p 8080:80 openproject/openproject:14`, then point `OPENPROJECT_URL` at `http://localhost:8080`.
+Open http://localhost:3000. No OP server handy? `docker run -d -p 8080:80 openproject/openproject:14`.
 
 ---
 
 ## 🐳 Docker
 
-Multi-stage `Dockerfile` (~170 MB compressed, non-root, healthchecked) + ready-to-run `docker-compose.yml`. Two install paths — same image, both honour live env-var swaps without a rebuild.
+Two install paths. Same image honours live env-var swaps without a rebuild.
 
-### Option A — Pull the prebuilt image (recommended)
+### Option A — Pull prebuilt (recommended)
 
-Every tagged release publishes a multi-arch (`linux/amd64` + `linux/arm64`) image to **GitHub Container Registry**. The image is **public** — no PAT or `docker login` needed. No clone needed either.
+Multi-arch images on GitHub Container Registry — public, no login needed.
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/tamzid958/opira/main/docker-compose.yml
 curl -fsSLO https://raw.githubusercontent.com/tamzid958/opira/main/.env.local.example
-mv .env.local.example .env && $EDITOR .env      # OAuth client + secret + AUTH_SECRET + AUTH_URL
-docker compose up -d                            # → http://localhost:3000
+mv .env.local.example .env && $EDITOR .env
+docker compose up -d
 ```
 
-Upgrade later: `docker compose pull && docker compose up -d`. Pin a version by editing `docker-compose.yml` (`:latest` → `:0.2.0`).
-
-**Auto-update (opt-in).** The shipped compose includes a [Watchtower](https://containrrr.dev/watchtower/) service that polls ghcr.io every 6h and restarts the container when a new image lands:
-
-```bash
-docker compose --profile autoupdate up -d
-```
-
-Pair it with the in-app **"new version available" banner** — the banner notifies signed-in users; Watchtower applies the upgrade on its next cycle.
+Upgrade: `docker compose pull && docker compose up -d`.
 
 ### Option B — Build from source
-
-For forks / local modifications.
 
 ```bash
 git clone https://github.com/tamzid958/opira.git && cd opira
@@ -151,264 +114,124 @@ cp .env.local.example .env && $EDITOR .env
 docker compose up -d --build
 ```
 
-> 💡 All env vars are read at request time. Same image runs in any environment — change `.env` and `docker compose up -d` (no rebuild). Put a TLS-terminating reverse proxy (nginx, Traefik, your cloud's LB) in front.
+> 💡 Change `.env` and re-run `docker compose up -d` — no rebuild needed. The shipped compose also has an opt-in [Watchtower](https://containrrr.dev/watchtower/) profile (`--profile autoupdate`) for automatic updates.
 
 ---
 
 ## ⚙ Configuration
 
 | Variable | Required | Purpose |
-|---|:---:|---|
-| `OPENPROJECT_URL` | ✅ | Base URL of your OpenProject instance, e.g. `https://op.example.com`. |
-| `OPENPROJECT_OAUTH_CLIENT_ID` | ✅ | OAuth app client ID (see [OAuth setup](#-register-the-oauth-client-in-openproject)). |
-| `OPENPROJECT_OAUTH_CLIENT_SECRET` | ✅ | OAuth app client secret. |
-| `AUTH_SECRET` | ✅ | 32+ byte secret signing NextAuth cookies. `openssl rand -base64 32`. |
-| `AUTH_URL` | prod only | Public origin. Auto-detected in dev; **set explicitly in production**. |
-| `OPIRA_DATA_SOURCE` | optional | `api` (default) or `hybrid`. See [Data sources](#-data-sources). |
-| `OPENPROJECT_DB_URL` | when `hybrid` | PostgreSQL connection string for OpenProject's database. Server-only — never log, never commit. |
-| `OPENPROJECT_DB_POOL_MAX` | optional | Max DB connections this Next.js process holds open (default `10`). |
-| `OPENPROJECT_STORY_POINTS_FIELD` | optional | `storyPoints` (default) or a custom-field key like `customField7`. |
-| `OPENPROJECT_WORKING_DAYS` | optional | Comma-separated day prefixes for burndown / capacity (default `Mon,Tue,Wed,Thu,Fri`). |
-| `HOURS_PER_POINT` | optional | Hours-per-point for the capacity view (default `4`). |
-| `OPIRA_TEST_DB_URL` | optional | Connection string used by the schema canary + DB integration tests (skipped when unset). |
-| `OPIRA_REDIS_URL` | optional | Redis connection string. Used for two things: **lookup caching** (statuses, types, priorities, schemas, t-shirt options — 30–60 min TTL, shared across pods) and **planning-poker** rooms (30-min idle TTL, pub/sub fan-out). Unset → both fall back to in-process Maps. Server-only. |
-| `OLLAMA_BASE_URL` | optional | Enables the **AI assist** feature. Set to `http://localhost:11434` for a local Ollama install, or `https://ollama.com` for Ollama Cloud. When unset all AI buttons are hidden. Server-only. |
-| `OLLAMA_API_KEY` | optional | API key for Ollama Cloud (`ollama.com/settings/keys`). Not required for a local Ollama instance. Server-only — never commit a real value. |
-| `OLLAMA_MODEL` | optional | Ollama model name. For local Ollama, the first available local model is used when this is unset; for Ollama Cloud a model name is required. |
+|---|---|---|
+| `OPENPROJECT_URL` | ✅ | Your OpenProject base URL |
+| `OPENPROJECT_OAUTH_CLIENT_ID` / `_SECRET` | ✅ | OAuth app credentials |
+| `AUTH_SECRET` | ✅ | `openssl rand -base64 32` |
+| `AUTH_URL` | prod | Public origin (auto-detected in dev) |
+| `OPIRA_DATA_SOURCE` | optional | `api` (default) or `hybrid` |
+| `OPENPROJECT_DB_URL` | hybrid | Postgres connection string (server-only) |
+| `OPENPROJECT_STORY_POINTS_FIELD` | optional | `storyPoints` (default) or `customFieldN` |
+| `OPENPROJECT_WORKING_DAYS` | optional | `Mon,Tue,Wed,Thu,Fri` default |
+| `HOURS_PER_POINT` | optional | `4` default |
+| `OPIRA_REDIS_URL` | optional | Redis for lookup caching + planning poker |
+| `OLLAMA_BASE_URL` | optional | Enables AI assist (Ollama) |
+| `OLLAMA_API_KEY` | optional | For Ollama Cloud (server-only) |
+| `OLLAMA_MODEL` | optional | Model name (auto-discovered locally) |
 
-All env vars are read at request time on the server. Values the client needs (`OPENPROJECT_URL`, `OPENPROJECT_STORY_POINTS_FIELD`, `OPENPROJECT_WORKING_DAYS`, plus read-only `dataSource` and `aiEnabled` indicators) are surfaced through React context — no `NEXT_PUBLIC_*` baking, no rebuild to change envs. Server-only secrets (`AUTH_SECRET`, OAuth client secret, `OPENPROJECT_DB_URL`) **never reach the browser**.
+All env vars read at request time. Client values surface through React context — no `NEXT_PUBLIC_*` baking.
 
 ---
 
 ## 🔀 Data sources
 
-Opira reads OpenProject through a [repository layer](./lib/data/) with two runtime-selectable modes. Both produce **identical UI shapes** — components don't change when the toggle flips.
+Opira reads OpenProject through a [repository layer](./lib/data/) with two modes. Both produce identical UI shapes.
 
 | Mode | Reads | Writes | When to use |
 |---|---|---|---|
-| `api` (default) | API | API | No DB credentials wired yet. Always-correct, slowest on big projects. |
-| `hybrid` (recommended) | DB-direct (`pg`) | API | Once `OPENPROJECT_DB_URL` is set. Joins, large lists, and dashboards become much faster; writes still go through the API so journals, notifications, parent progress, and webhooks stay intact. Phase 2 will graduate selected writes here under an explicit per-field opt-in. |
+| `api` (default) | API | API | No DB credentials needed. Always correct. |
+| `hybrid` | DB-direct (`pg`) | API | Faster on large projects; writes still route through the API for journal/notification safety. |
 
-Toggle with one env var, no rebuild:
+Toggle with one env var: `OPIRA_DATA_SOURCE=hybrid` + `OPENPROJECT_DB_URL=postgres://...`.
 
-```bash
-OPIRA_DATA_SOURCE=hybrid
-OPENPROJECT_DB_URL=postgres://op_user:secret@db.internal:5432/openproject_production
-```
-
-Health probe: `curl http://localhost:3000/api/health/data-source` → `{mode: "hybrid", ok: true, dbLatencyMs: …, apiLatencyMs: …}`.
-
-Architecture details and how-to-add-an-entity are in [docs/data-layer.md](./docs/data-layer.md).
+Health probe: `curl http://localhost:3000/api/health/data-source`. Details in [docs/data-layer.md](./docs/data-layer.md).
 
 ---
 
 ## 🃏 Planning poker
 
-Open a work package, switch the right sidebar to the **Poker** tab, and you're in a live voting room — one room per work package, joined automatically by anyone with edit access. Cast a card, hit **Reveal** when everyone's in, and **Apply** writes the agreed size back to OpenProject through the same `useUpdateTask` mutation any other estimate uses (so journals, notifications, and `lockVersion` all behave normally).
+Open a work package, switch to the **Poker** tab — one room per work package, joined automatically by anyone with edit access. Cast a card, hit **Reveal**, and **Apply** writes the agreed size back through the same mutation pipeline (journals, notifications, `lockVersion` all behave normally). The tab only appears when story points use a t-shirt-style `CustomOption`.
 
-The Poker tab only appears when the project's story-points field is configured as a t-shirt-style `CustomOption` (see `OPENPROJECT_STORY_POINTS_FIELD`). Numeric / duration fields keep working through the regular picker.
-
-### How it fans out
-
-```mermaid
-flowchart LR
-  subgraph Browsers
-    A["Browser A<br/>(/projects/.../?wp=42, Poker tab)"]
-    B["Browser B<br/>(/projects/.../?wp=42, Poker tab)"]
-  end
-
-  subgraph Pods["Next.js (1+ pods)"]
-    P1["Pod 1<br/>SSE stream + POST handlers"]
-    P2["Pod 2<br/>SSE stream + POST handlers"]
-  end
-
-  subgraph Store["lib/poker — async facade"]
-    direction TB
-    Facade["room-store.js<br/>(picks backend at module load)"]
-    Mem[("memory-store.js<br/>Map&lt;roomId, RoomState&gt;<br/>30-min idle eviction")]
-    Redis[("redis-store.js<br/>opira:poker:room:&#123;id&#125;<br/>WATCH/MULTI + pub/sub")]
-    Facade -- "OPIRA_REDIS_URL unset" --> Mem
-    Facade -- "OPIRA_REDIS_URL set" --> Redis
-  end
-
-  RedisSrv[("Redis<br/>JSON blob per room<br/>30-min TTL<br/>opira:poker:room:&#123;id&#125;:events")]
-
-  A <-- "EventSource<br/>SSE" --> P1
-  B <-- "EventSource<br/>SSE" --> P2
-  P1 --> Facade
-  P2 --> Facade
-  Redis <--> RedisSrv
-
-  classDef pod fill:#eef,stroke:#447
-  classDef store fill:#efe,stroke:#474
-  classDef ext fill:#fee,stroke:#744
-  class P1,P2 pod
-  class Mem,Redis,Facade store
-  class RedisSrv ext
-```
-
-A vote on Pod 1 writes to Redis and `PUBLISH`es on the room's channel. Pod 2's subscriber wakes up, re-fetches `getPublicState`, and pushes a `room.state` event down its SSE pipe to Browser B. Without Redis, the same flow stays inside one pod's `Map`.
-
-### Two backends, one signature
-
-The room store ([lib/poker/](./lib/poker/)) is an async facade that picks at module load:
+The room store ([lib/poker/](./lib/poker/)) picks a backend at module load:
 
 | Backend | Selected when | Behaviour |
 |---|---|---|
-| **In-memory** | `OPIRA_REDIS_URL` unset (default) | `Map<roomId, RoomState>` per Next.js process. 30-min idle eviction. Lost on restart. **Single pod only** — different replicas won't see each other's rooms. |
-| **Redis** | `OPIRA_REDIS_URL` set | Whole-room JSON blob at `opira:poker:room:{roomId}`, 30-min TTL refreshed on every write. Mutations use WATCH/MULTI for atomic R-M-W. Pub/sub on `…:events` fans state changes out to every connected pod. **Multi-pod safe.** Rooms still ephemeral — TTL expires and rooms vanish. |
+| **In-memory** | `OPIRA_REDIS_URL` unset | `Map` per process, 30-min idle eviction, lost on restart. Single pod only. |
+| **Redis** | `OPIRA_REDIS_URL` set | JSON blob + pub/sub across pods. 30-min TTL. Multi-pod safe. |
 
-If Redis is configured but unreachable, the SSE stream + POST routes return `503` and the FAB shows "Room offline" — the regular `TShirtPicker` keeps working for solo single-click estimates.
+If Redis is unreachable, the FAB shows "Room offline" — the regular `TShirtPicker` still works for solo estimates. Without Redis, the in-memory fallback works for single-pod deployments.
 
-### Wiring Redis with Compose
-
-`docker-compose.yml` ships a `redis` service alongside `opira`. Just set `OPIRA_REDIS_URL` in `.env` and bring the stack up — Opira `depends_on: redis (service_healthy)` so it waits for Redis before starting.
-
-```bash
-# In .env
-OPIRA_REDIS_URL=redis://redis:6379
-
-docker compose up -d
-```
-
-The bundled Redis is hardened for the poker workload: 64 MB memory cap with `allkeys-lru` eviction, AOF persistence on a `redis-data` volume so a container restart mid-vote doesn't reset live rooms, no port mapping (the Compose network is the auth boundary — there's no password). Inspect with `docker compose exec redis redis-cli`.
-
-If you'd rather not run Redis at all, leave `OPIRA_REDIS_URL` unset — Opira falls back to the in-memory store for both poker and lookup caching. The Redis container will still come up unused; remove it from `docker-compose.yml` if you want to skip it entirely.
-
-### Lookup caching in Redis
-
-When `OPIRA_REDIS_URL` is set, Opira caches OpenProject metadata that rarely changes across all pods:
-
-| Data | TTL | Cache key pattern |
-|---|---|---|
-| Statuses, priorities | 30 min | `opira:lookups:statuses`, `opira:lookups:priorities` |
-| Types | 30 min | `opira:lookups:types:{projectId\|__global__}` |
-| Work-package schema | 60 min | `opira:lookups:schema:{projectId}-{typeId}` |
-| T-shirt size options | 30 min | `opira:lookups:custom-options:{href}` |
-
-Each pod also keeps a 5-minute in-process copy so Redis round-trips only happen on first load per pod. The cache degrades gracefully — if Redis is unreachable the in-process Map serves the request.
-
-If an OpenProject admin changes types, statuses, or custom fields and you need immediate effect, flush the cache without restarting:
-
-```bash
-curl -X DELETE https://your-opira.example.com/api/openproject/lookups/cache \
-  -H "Cookie: <your session cookie>"
-# → { "ok": true, "deleted": 5 }
-```
-
-In-process caches drain naturally within 5 minutes after the DELETE.
+When Redis is active, lookup data (statuses, types, schemas) is cached in `opira:lookups:*` keys (30-60 min TTL). Flush with `curl -X DELETE /api/openproject/lookups/cache`.
 
 ---
 
 ## ✨ AI assist
 
-Opira integrates [Ollama](https://ollama.com) (local or cloud) across **12 touch-points** to help with the writing-heavy parts of project management. Every button is **fully optional** — when `OLLAMA_BASE_URL` is not set nothing changes in any normal flow.
+Opira integrates [Ollama](https://ollama.com) (local or cloud) across 12 touch-points — task create/detail, sprint planning, milestone tracking, backlog grooming, and reports. Every button is optional: when `OLLAMA_BASE_URL` is unset nothing changes.
 
-### Where AI buttons appear
+**Action variants:** `insert` (fills field immediately), `accept` (preview → accept/dismiss), `append` (preview → append to existing), `copy` (preview → clipboard).
 
-| Location | What it generates | Action |
-|---|---|---|
-| Task create modal → **Title** | Alternative / improved title | Inserts immediately |
-| Task create modal → **Description** | Structured HTML description | Preview → Accept (replaces) |
-| Task detail → **Title** (edit mode) | Improved title | Inserts immediately |
-| Task detail → **Description** (edit mode) | Draft description from title + parent + children | Preview → Accept (replaces) |
-| Task detail → **Comment** box | Draft comment based on task context | Inserts immediately |
-| Task detail → **Acceptance criteria** | Testable criteria as bullet list | Preview → Append to description |
-| Task detail → **Sub-tasks** | Suggested breakdown titles | Preview → Open add-task form |
-| Sprint modal → **Sprint goal** | Goal based on sprint name + task list | Inserts immediately |
-| Complete-sprint modal → **Release notes** | Markdown-style release notes | Preview → Save to sprint description |
-| Milestones page → **Status update** | Stakeholder-ready status paragraph | Preview → Copy to clipboard |
-| Milestones page → **Risk identification** | Overdue / blocked risk summary | Preview → Copy to clipboard |
-| Backlog grooming panel → **Description** | Draft description for undescribed tasks | Preview → Save directly to task |
-| Reports page → **Sprint retrospective** | Start/stop/continue format | Preview → Copy to clipboard |
-| Reports page → **Stakeholder report** | Executive summary of sprint results | Preview → Copy to clipboard |
-| Reports page → **Trend commentary** | Velocity trend analysis | Preview → Copy to clipboard |
-
-### Action variants
-
-| Variant | User interaction |
-|---|---|
-| `insert` | No preview card — result fills the field immediately |
-| `accept` | Preview card → **Accept** replaces the current value, **Dismiss** discards |
-| `append` | Preview card → **Append** adds to existing content, **Dismiss** discards |
-| `copy` | Preview card → **Copy** copies plain text to clipboard, **Done** closes |
-
-### Setup — Local Ollama (no API key)
+### Setup
 
 ```bash
-# 1. Install Ollama — https://ollama.com
-# 2. Pull a model
+# Local Ollama (no API key)
 ollama pull llama3.2
-
-# 3. Add to .env
 OLLAMA_BASE_URL=http://localhost:11434
-# OLLAMA_MODEL is optional — first available local model is used when unset
-```
 
-### Setup — Ollama Cloud (API key required)
-
-Create a key at [ollama.com/settings/keys](https://ollama.com/settings/keys), then:
-
-```bash
+# Ollama Cloud (API key required)
 OLLAMA_BASE_URL=https://ollama.com
 OLLAMA_API_KEY=<your key>
-OLLAMA_MODEL=llama3.2    # required for cloud — no free model auto-discovery
+OLLAMA_MODEL=llama3.2
 ```
 
 ### How prompts are built
 
-Every mode combines available context before calling the model. All user-supplied fields (titles, descriptions, task names) are stripped of HTML tags, null bytes, and control characters before entering the prompt (**prompt-injection prevention**). Model output is sanitised with DOMPurify against a strict `<p>/<ul>/<ol>/<li>/<strong>/<em>/<br>` allowlist before reaching the editor or clipboard.
-
-| Context input | Limit |
-|---|---|
-| Task / sprint / milestone title | — |
-| Existing description (HTML-stripped) | 600 chars |
-| Parent task title + description (HTML-stripped) | 400 chars |
-| Child task titles | all |
-| Sprint task list, completed tasks, velocity stats | mode-dependent |
+All user-supplied fields are stripped of HTML, null bytes, and control characters before entering the prompt (prompt-injection prevention). Model output is sanitised with DOMPurify against a strict `<p>/<ul>/<ol>/<li>/<strong>/<em>/<br>` allowlist.
 
 ### Error handling
 
 | Scenario | User sees |
 |---|---|
-| `OLLAMA_BASE_URL` not set | All AI buttons hidden — nothing changes |
-| Ollama not running / unreachable | Error chip: _"AI service unavailable — is Ollama running?"_ |
-| No local model available and no `OLLAMA_MODEL` set | Error chip: _"No Ollama model configured…"_ |
-| Model not pulled / subscription required | Error chip with Ollama's error message |
-| Request timeout (15 s) | Error chip: _"AI request timed out"_ |
+| Ollama not running / unreachable | _"AI service unavailable — is Ollama running?"_ |
+| No local model and `OLLAMA_MODEL` unset | _"No Ollama model configured…"_ |
+| Request timeout (30 s) | _"AI request timed out"_ |
 
 ---
 
-## 🔑 Register the OAuth client in OpenProject
+## 🔑 OAuth setup
 
-Once, in your OpenProject admin: **Administration → Authentication → OAuth applications → Add**.
+In OpenProject admin: **Administration → Authentication → OAuth applications → Add**.
 
 | Field | Value |
 |---|---|
-| **Name** | `Opira` (or anything memorable) |
-| **Redirect URI** | `<AUTH_URL>/api/auth/callback/openproject`<br>_locally:_ `http://localhost:3000/api/auth/callback/openproject` |
-| **Confidential** | ✅ yes |
-| **Scopes** | `api_v3` |
+| Name | `Opira` |
+| Redirect URI | `<AUTH_URL>/api/auth/callback/openproject` (locally `http://localhost:3000/…`) |
+| Confidential | ✅ yes |
+| Scopes | `api_v3` |
 
-Save, then copy the generated **Client ID** + **Client Secret** into `.env`.
-
-> Refresh tokens rotate transparently in [auth.js](./auth.js) with a 60s buffer; failures set `token.error = "RefreshAccessTokenError"` and redirect to `/sign-in`.
+Save, copy **Client ID** + **Secret** into `.env`. Refresh tokens rotate transparently in [auth.js](./auth.js).
 
 ---
 
-## 🧭 Routes & deep links
+## 🧭 Routes
 
 | Path | Purpose |
 |---|---|
-| `/` → `/projects` | Bounces to your last-visited project, or the first one accessible. |
-| `/projects/<id>/board` | Sprint board with filters and switcher. |
-| `/projects/<id>/backlog` | Sprint sections with bulk operations. |
-| `/projects/<id>/timeline` | Calendar-style timeline. |
-| `/projects/<id>/reports` | Burndown + velocity + capacity. |
-| `/projects/<id>/{overview,tags,members,documents}` | Project dashboard, categories, memberships, documents reader. |
-| `/account` | Identity + deep-link to OpenProject account settings. |
+| `/projects/<id>/board` | Sprint board with filters |
+| `/projects/<id>/backlog` | Sprint sections with bulk operations |
+| `/projects/<id>/timeline` | Calendar timeline |
+| `/projects/<id>/reports` | Burndown, velocity, capacity |
+| `/projects/<id>/{overview,tags,members,documents}` | Dashboard, categories, memberships, docs |
+| `/account` | Profile |
 
-**Modal state rides URL params** — `?wp=<id>` opens a work package, `?create=1` opens the create dialog, `?s=<id>` selects a board sprint. Deep links are shareable and the back button just works.
+Modal state lives in URL params (`?wp=<id>`, `?create=1`, `?s=<sprintId>`) — deep links and back/forward work.
 
 ---
 
@@ -417,141 +240,92 @@ Save, then copy the generated **Client ID** + **Client Secret** into `.env`.
 Three layers, one promise: **the access token never touches the browser.**
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                            BROWSER                                 │
-│  React 19 components ── TanStack Query hooks ── URL params (state) │
-└─────────────────────────────────┬──────────────────────────────────┘
-                                  │  fetchJson()  (lib/api-client.js)
-                                  ▼
-┌────────────────────────────────────────────────────────────────────┐
-│                NEXT.JS SERVER  (route handlers)                    │
-│  app/api/openproject/*  ── repository layer (lib/data/)            │
-│  Reads OAuth bearer from session, injects Authorization header     │
-└──────────────┬───────────────────────────────────┬─────────────────┘
-       writes  │                            reads  │  (mode: hybrid/db)
-              ▼                                   ▼
-   ┌──────────────────────────┐      ┌──────────────────────────┐
-   │  OPENPROJECT v3 API      │      │  OPENPROJECT POSTGRES    │
-   │  (HAL+JSON, your server) │      │  (pg, server-only pool)  │
-   └──────────────────────────┘      └──────────────────────────┘
+Browser → Next.js route handlers → OpenProject API (writes)
+                                ↕ (hybrid: reads via pg)
+                              OpenProject Postgres
 ```
 
-In `api` mode every arrow goes left; in `hybrid`/`db` mode reads go right (DB-direct) and writes go left (API). The repository layer in [lib/data/](./lib/data) presents one shape to the components either way.
+- **Layer 1 — Auth** ([auth.js](./auth.js)). Hand-rolled OAuth provider. JWT callback rotates refresh tokens.
+- **Layer 2 — Server proxy** ([app/api/openproject/](./app/api/openproject)). Every request brokered server-side; OAuth bearer injected here. Route handlers delegate to [lib/data/](./lib/data) — API repos via `opFetch`, DB repos via `pg`.
+- **Layer 3 — Client** ([components/](./components)). TanStack Query hooks + URL-param modals. Mutations are optimistic with rollback.
 
-- **Layer 1 — Auth** ([auth.js](./auth.js)). Hand-rolled OAuth provider (OpenProject has no OIDC discovery). JWT callback rotates refresh tokens; [auth.config.js](./auth.config.js) is the edge-safe slice consumed by middleware.
-- **Layer 2 — Server proxy + repos** ([app/api/openproject/](./app/api/openproject), [lib/data/](./lib/data)). Every browser request is brokered server-side; OAuth bearer injected here. Route handlers delegate to repositories — `lib/data/api/*.api.js` (HAL via [`opFetch`](./lib/openproject/client.js)) and `lib/data/db/*.db.js` (SQL via the `pg` pool in [lib/data/db/client.js](./lib/data/db/client.js)).
-- **Layer 3 — Client** ([components/](./components)). Feature components consume hooks from [lib/hooks/](./lib/hooks). Mutations are optimistic with rollback. Modal state lives in URL params.
+### OpenProject gotchas
 
-### The bits that bite (read before editing the API layer)
+- `PATCH` without `lockVersion` fails 409 — use [`opPatchWithLock`](./lib/openproject/client.js)
+- HAL collections under `_embedded.elements` — flatten through [mappers.js](./lib/openproject/mappers.js)
+- Permissions from live `_links`, never role names — use [`usePermissions`](./lib/hooks/use-permissions.js)
+- Filters are JSON-encoded arrays — use [`buildFilters`](./lib/openproject/client.js)
+- Max `pageSize` 1000, 1-indexed via `offset` — use [`fetchAllPages`](./lib/openproject/client.js)
+- Story points field is configurable — read through [story-points.js](./lib/openproject/story-points.js)
+- Sprints are OpenProject `version` resources (`open` / `locked` / `closed`)
 
-- 🔒 **Optimistic locking** — most resources carry `lockVersion`. `PATCH` without it fails 409. Use [`opPatchWithLock`](./lib/openproject/client.js); surface `LOCK_CONFLICT` as _"someone else updated this — refresh"_.
-- 🔗 **HAL JSON** — collections under `_embedded.elements`, navigation/permissions under `_links`. Flatten through [mappers.js](./lib/openproject/mappers.js); never leak HAL into components.
-- 🛡 **Live permissions** — each resource's `_links` says what the *current* user can do. Drive UI gating via [`usePermissions`](./lib/hooks/use-permissions.js); never re-derive from role names.
-- 🧮 **Filters are JSON** — OpenProject's `filters` query param is a JSON-encoded array of `{ field: { operator, values } }`. Use [`buildFilters`](./lib/openproject/client.js).
-- 📄 **Pagination** — max `pageSize` 1000, 1-indexed via `offset`. Walk with [`fetchAllPages`](./lib/openproject/client.js) (default cap 5000).
-- 🎯 **Story points field is configurable** — always read through [story-points.js](./lib/openproject/story-points.js).
-- 🏃 **Sprints are OpenProject `version` resources** with `open / locked / closed` statuses.
-
-Detailed agent-facing conventions live in [CLAUDE.md](./CLAUDE.md).
+Agent conventions: [CLAUDE.md](./CLAUDE.md).
 
 ---
 
 ## 📂 Project layout
 
-```text
-opira/
-├─ app/                                  Next.js App Router
-│  ├─ layout.jsx · page.jsx · {loading,error,not-found}.jsx
-│  ├─ projects/[projectId]/{board,backlog,timeline,reports,overview,tags,members,documents}/
-│  ├─ api/openproject/*                  authenticated proxy routes
-│  ├─ api/ai/suggest-description/        Ollama proxy — 13 prompt modes, DOMPurify-sanitised output
-│  ├─ api/health/data-source/            mode + latency probe
-│  ├─ api/updates/check/                 GitHub-release poll for the upgrade banner
-│  └─ account/page.jsx
-├─ components/{ui/,*.jsx}                shared primitives + feature components
-├─ lib/
-│  ├─ data/                              repository layer (api/, db/, authz/, ports/)
-│  │  ├─ api/lookup-repository.api.cached.js   Redis+in-process cache wrapper for lookups
-│  │  └─ redis-lookups-cache.js                get/set/flush helpers for opira:lookups:* keys
-│  ├─ hooks/                             TanStack Query wrappers
-│  ├─ openproject/                       HAL client + mappers + helpers
-│  └─ {offline,server}/
-├─ auth.js · auth.config.js              NextAuth wiring
-├─ docs/data-layer.md                    repository pattern + Phase 1/2 plan
-├─ Dockerfile · docker-compose.yml       container build + stack
-└─ next.config.mjs · jsconfig.json · vitest.config.js
+```
+app/                   Next.js App Router (pages + API routes)
+  api/openproject/     Authenticated proxy to OP
+  api/ai/              Ollama proxy
+  projects/[id]/       Board, backlog, timeline, reports, etc.
+components/            React components (primitives + features)
+lib/
+  data/                Repository layer (api/ + db/ + authz/)
+  hooks/               TanStack Query wrappers
+  openproject/         HAL client, mappers, helpers
+auth.js                NextAuth OAuth wiring
 ```
 
 ---
 
 ## 🧰 Tech stack
 
-| Layer | Choice | Why |
-|---|---|---|
-| Framework | [Next.js 16](https://nextjs.org/) (App Router, Turbopack) | RSC + route handlers + standalone output |
-| UI runtime | [React 19](https://react.dev/) | actions, transitions, suspense |
-| Styling | [Tailwind CSS v4](https://tailwindcss.com/) | tokens declared once in `app/globals.css` |
-| Data | [TanStack Query v5](https://tanstack.com/query) | optimistic mutations + rollback |
-| Auth | [NextAuth.js v5](https://authjs.dev/) | OAuth 2.0 + PKCE, refresh-token rotation |
-| Forms | [react-hook-form](https://react-hook-form.com/) + [zod](https://zod.dev/) | validation + shape inference |
-| Editor | [Tiptap](https://tiptap.dev/) + [DOMPurify](https://github.com/cure53/DOMPurify) | rich text, sanitised on render |
-| DnD · Icons · Toasts | [dnd-kit](https://dndkit.com/) · [lucide-react](https://lucide.dev/) · [sonner](https://sonner.emilkowal.ski/) | accessible · tree-shakeable · themed |
-| Lang | **JavaScript + JSDoc** (not TypeScript by design) | `@/*` alias via `jsconfig.json` |
-
----
+Next.js 16 (App Router) · React 19 · Tailwind CSS v4 · TanStack Query v5 · NextAuth v5 · react-hook-form + zod · Tiptap + DOMPurify · dnd-kit · lucide-react · sonner · JavaScript + JSDoc
 
 ## 🛠 Scripts
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Turbopack dev server on `:3000`. |
-| `npm run build` | Production build → `.next/standalone`. |
-| `npm run start` | Run the production build locally. |
-| `npm run lint` | ESLint via `eslint-config-next`. |
-| `npm test` | Vitest (watch mode). |
-| `npm run test:run` | Vitest one-shot — what CI runs. |
-| `npm run test:coverage` | Vitest + v8 coverage. |
+| `npm run dev` | Turbopack dev server |
+| `npm run build` | Production build |
+| `npm run start` | Run production build locally |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest (watch) |
+| `npm run test:run` | Vitest one-shot |
 
-The Vitest suite lives next to the data-layer code (`lib/data/**/*.test.js`) and asserts the contract that **API and DB repositories produce identical UI shapes** for the same logical entity. The DB schema canary (`lib/data/db/schema-canary.test.js`) and live integration tests are skipped unless `OPIRA_TEST_DB_URL` is set, so the default suite needs no Docker. Strategy: [docs/data-layer.md](./docs/data-layer.md#testing-strategy).
+Tests in `lib/data/**/*.test.js` assert API and DB repos produce identical UI shapes. Strategy: [docs/data-layer.md](./docs/data-layer.md).
 
----
+## 📦 Performance
 
-## 📦 Performance & footprint
-
-- **Image** — ~170 MB compressed, multi-stage build, alpine runner, non-root (`uid 1001`).
-- **Cold build** — ~2 min on a fresh machine; **~10 s** on a code-only change (deps cache layer).
-- **Bundle** — `console.log/info/debug` stripped in production (see [next.config.mjs](./next.config.mjs)); `error` and `warn` survive.
-- **Health probe** — accepts any 1xx-4xx (a 307 to `/sign-in` means the server is up and routing).
+~170 MB compressed image, multi-stage alpine build, non-root. `console.log/info/debug` stripped in production.
 
 ---
 
-## 🛡 Security model
+## 🛡 Security
 
-- **Access tokens are server-side only.** OAuth bearer is injected in route handlers and never serialised to the client.
-- **Refresh tokens rotate** with a 60s buffer; rotation failures redirect to `/sign-in`.
-- **HTML user content** (descriptions, comments) is **always** sanitised with `isomorphic-dompurify` on render. Never `dangerouslySetInnerHTML` raw OpenProject HTML.
-- **AI prompt sanitization** — all user-supplied fields are stripped of HTML, null bytes, and control characters before entering any Ollama prompt. AI-generated HTML is sanitised with DOMPurify (strict tag allowlist) both server-side and client-side before being shown or persisted.
-- **Permissions** are read live from each resource's `_links`; never duplicated client-side.
-- **CSRF** handled via NextAuth signed session cookies + same-origin proxy routes.
-
-Suspected vulnerabilities → please report privately per [SECURITY.md](./SECURITY.md). Do **not** open a public issue.
+- OAuth bearer injected server-side — never serialised to the client
+- Refresh tokens rotate with a 60s buffer; failure redirects to `/sign-in`
+- HTML user content sanitised with `isomorphic-dompurify` on render
+- AI inputs stripped of HTML/control chars before prompts; output DOMPurify-sanitised
+- CSRF handled via NextAuth signed session cookies + same-origin proxy
 
 ---
 
 ## 🤝 Contributing
 
-PRs welcome — small or large. Full guide in [CONTRIBUTING.md](./CONTRIBUTING.md). 30-second version:
+PRs welcome. Full guide in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ```bash
-git clone https://github.com/<your-fork>/opira.git && cd opira
-git checkout -b feat/<short-name>          # or fix/, refactor/, docs/, chore/, test/
-# …make your changes…
-npm run lint && npm run build              # both must pass
-git commit -m "feat(board): swimlanes by assignee"
-# Open a PR against `main`. Attach a screen-record for any UI change.
+git checkout -b feat/your-feature
+# make changes
+npm run lint && npm run build
+git commit -m "feat: your feature"
+# open PR against main
 ```
 
-Conventional prefixes: `feat:` · `fix:` · `refactor:` · `docs:` · `chore:` · `test:`. Code of Conduct in [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+Prefixes: `feat:` · `fix:` · `refactor:` · `docs:` · `chore:` · `test:`.
 
 ---
 
@@ -560,57 +334,35 @@ Conventional prefixes: `feat:` · `fix:` · `refactor:` · `docs:` · `chore:` �
 <details>
 <summary><strong>Does Opira store any of my data?</strong></summary>
 
-No. Opira owns no application database and collects no analytics. Every screen reads from your OpenProject instance and every mutation is round-tripped to it. The only persistent state Opira owns is your signed session cookie. If you opt in to `OPIRA_REDIS_URL`, Opira writes short-lived cache entries (lookup metadata, poker rooms) into Redis under the `opira:` namespace — these are ephemeral and safe to delete at any time. (In `hybrid` mode Opira reads directly from *OpenProject's* PostgreSQL — that's still **your** OP server's database, not a separate Opira store.)
+No. Opira owns no database and collects no analytics. Every screen reads from your OpenProject instance. The only persistent state is your session cookie. With Redis, ephemeral cache entries under `opira:` namespace.
 </details>
 
 <details>
-<summary><strong>When should I switch to <code>hybrid</code> mode?</strong></summary>
+<summary><strong>When should I switch to hybrid mode?</strong></summary>
 
-When the v3 API gets in your way. The HAL+JSON pagination is fine for small projects but starts to feel slow once boards and backlogs cross a few hundred work packages. With `OPIRA_DATA_SOURCE=hybrid` the read path is direct SQL with native joins — list pages are noticeably snappier, and you unlock fields the API doesn't expose. Writes still go through the API in Phase 1, so OpenProject's journals, notifications, parent-progress recalc, and webhooks all stay correct. You need a Postgres connection string (`OPENPROJECT_DB_URL`) and that's it — no schema migrations, no shadow data store. Stay on `api` if your OP install is small or you can't grant DB access from where Opira runs.
+When the v3 API feels slow on large projects. Hybrid reads via SQL — snappier lists, unlocks fields the API doesn't expose. Writes still go through the API so journals and notifications remain correct.
 </details>
 
 <details>
 <summary><strong>Can I run Opira against OpenProject Cloud?</strong></summary>
 
-Yes — point `OPENPROJECT_URL` at your hosted instance and register the OAuth app under your cloud admin. Opira doesn't care whether the server is self-hosted or hosted by Greenkeeper GmbH. Note that **`hybrid` mode is only practical for self-hosted instances** since Cloud doesn't expose the underlying Postgres.
+Yes — point `OPENPROJECT_URL` at your hosted instance. Hybrid mode is only for self-hosted (Cloud doesn't expose Postgres).
 </details>
 
 <details>
-<summary><strong>Why JavaScript and not TypeScript?</strong></summary>
+<summary><strong>Why JavaScript, not TypeScript?</strong></summary>
 
-Pragmatism. The codebase uses JSDoc + `jsconfig.json` for editor tooling and avoids the TS toolchain tax. PRs that flip files to `.ts`/`.tsx` will be declined.
-</details>
-
-<details>
-<summary><strong>Does Opira replace OpenProject?</strong></summary>
-
-No. Opira is a **front-end only** — zero meaning without an OpenProject server behind it. Think "Insomnia for REST" or "TablePlus for Postgres" — same data, different cockpit.
-</details>
-
-<details>
-<summary><strong>How do permissions work?</strong></summary>
-
-OpenProject returns a `_links` object on every resource that lists the actions the *current* user can perform. Opira reads that directly via [`usePermissions`](./lib/hooks/use-permissions.js) and gates every button accordingly. There is no role-name table to keep in sync.
+Pragmatism. JSDoc + `jsconfig.json` for tooling, no TS toolchain tax. PRs flipping to `.ts` will be declined.
 </details>
 
 <details>
 <summary><strong>What about offline?</strong></summary>
 
-Mutations queue in [lib/offline/](./lib/offline) when the network drops and replay when it returns. Reads are cached by TanStack Query.
+Mutations queue in [lib/offline/](./lib/offline) and replay on reconnect. Reads cached by TanStack Query.
 </details>
 
 ---
 
-## 📜 License & credits
+## 📜 License
 
 [MIT](./LICENSE) © **Tamzid Ahmed**
-
-Built on the [OpenProject](https://www.openproject.org/) team's excellent v3 API and the [Next.js](https://nextjs.org/) team's App Router.
-
-If Opira saves your team time, **⭐ star the repo** — that's how it finds its next user.
-
-<div align="center">
-
-**[⬆ back to top](#opira)**
-
-</div>
