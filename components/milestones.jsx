@@ -103,11 +103,11 @@ function ChildRow({ task, sprints, onClick }) {
 
 // ─── Milestone (parent) row ───────────────────────────────────────
 
-function MilestoneRow({ milestone, children, sprints, onTaskClick }) {
+function MilestoneRow({ milestone, childTasks, sprints, onTaskClick }) {
   const [open, setOpen] = useState(true);
   const sprint = sprintName(milestone, sprints);
-  const childCount = children.length;
-  const closedCount = children.filter((c) => c.statusIsClosed).length;
+  const childCount = childTasks.length;
+  const closedCount = childTasks.filter((c) => c.statusIsClosed).length;
 
   return (
     <>
@@ -177,7 +177,7 @@ function MilestoneRow({ milestone, children, sprints, onTaskClick }) {
       </tr>
 
       {open &&
-        children.map((child) => (
+        childTasks.map((child) => (
           <ChildRow
             key={child.id}
             task={child}
@@ -266,7 +266,7 @@ export function Milestones({ tasks, sprints, onTaskClick }) {
             <MilestoneRow
               key={milestone.id}
               milestone={milestone}
-              children={childMap.get(String(milestone.nativeId)) || []}
+              childTasks={childMap.get(String(milestone.nativeId)) || []}
               sprints={sprints}
               onTaskClick={onTaskClick}
             />
