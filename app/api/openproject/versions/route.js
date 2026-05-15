@@ -1,6 +1,7 @@
 import { opFetch } from "@/lib/openproject/client";
 import { buildVersionCreateBody, mapVersionFull } from "@/lib/openproject/mappers";
 import { errorResponse } from "@/lib/openproject/route-utils";
+import { flushSprintCache } from "@/lib/data/redis-lookups-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export async function POST(req) {
       method: "POST",
       body: JSON.stringify(body),
     });
+    void flushSprintCache();
     return Response.json(mapVersionFull(v));
   } catch (e) {
     return errorResponse(e);
