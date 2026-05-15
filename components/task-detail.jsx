@@ -693,11 +693,13 @@ export function TaskDetail({
                   parentTitle: epicLabel || undefined,
                 }}
                 onAccept={(html) => {
-                  setDescVal((prev) => (prev ? prev + html : html));
+                  const current = descVal || "";
+                  const merged = current + html;
+                  setDescVal(merged);
                   setEditingDesc(false);
                   onUpdate(task.id, {
-                    description: (task.descriptionHtml || task.description || "") + html,
-                    descriptionHtml: (task.descriptionHtml || task.description || "") + html,
+                    description: merged,
+                    descriptionHtml: merged,
                   });
                 }}
               />
