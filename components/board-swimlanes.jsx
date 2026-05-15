@@ -44,6 +44,7 @@ function SectionHeader({
   onClickParent,
   fallbackLabel,
   assignees,
+  estimateMode = "numeric",
 }) {
   const parentAssignee = parent?.assignee
     ? findById(assignees, parent.assignee) || {
@@ -92,17 +93,17 @@ function SectionHeader({
             <span>
               {count} {count === 1 ? "sub-task" : "sub-tasks"}
             </span>
-            {formatEstimate(parent) != null && (
+            {formatEstimate(parent, { mode: estimateMode }) != null && (
               <span
                 className="hidden sm:inline tabular-nums"
                 title={
                   parent.points != null &&
-                  String(parent.points) !== formatEstimate(parent)
+                  String(parent.points) !== formatEstimate(parent, { mode: estimateMode })
                     ? `${parent.points} story points`
                     : undefined
                 }
               >
-                {formatEstimate(parent)}
+                {formatEstimate(parent, { mode: estimateMode })}
               </span>
             )}
             <Avatar user={parentAssignee} size="sm" />
@@ -139,6 +140,7 @@ function Card({
   onStatusChange,
   recentlyUpdated = false,
   fadedByOverlay = false,
+  estimateMode = "numeric",
 }) {
   const assignee =
     findById(assignees, task.assignee) ||
@@ -219,17 +221,17 @@ function Card({
         </span>
         <span className="ml-auto inline-flex items-center gap-1.5 shrink-0">
           <TaskPriorityIcon task={task} size={12} />
-          {formatEstimate(task) != null && (
+          {formatEstimate(task, { mode: estimateMode }) != null && (
             <span
               className="px-1.5 py-px rounded-full bg-surface-muted text-[10.5px] font-medium text-fg-muted tabular-nums"
               title={
                 task.points != null &&
-                String(task.points) !== formatEstimate(task)
+                String(task.points) !== formatEstimate(task, { mode: estimateMode })
                   ? `${task.points} story points`
                   : undefined
               }
             >
-              {formatEstimate(task)}
+              {formatEstimate(task, { mode: estimateMode })}
             </span>
           )}
           <Avatar user={assignee} size="sm" />
@@ -256,6 +258,7 @@ function DraggableCard({
   onStatusChange,
   recentlyUpdated,
   fadedByOverlay,
+  estimateMode = "numeric",
 }) {
   const editable = task.permissions?.update !== false;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -276,6 +279,7 @@ function DraggableCard({
       onStatusChange={onStatusChange}
       recentlyUpdated={recentlyUpdated}
       fadedByOverlay={fadedByOverlay}
+      estimateMode={estimateMode}
     />
   );
 }
@@ -318,6 +322,7 @@ export function BoardSwimlanes({
   onMoveTask,
   onUpdate,
   updatedSince = null,
+  estimateMode = "numeric",
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -457,6 +462,7 @@ export function BoardSwimlanes({
                 onToggleCollapse={() => toggle(g.key)}
                 onClickParent={() => onTaskClick?.(g.parent.id)}
                 assignees={assignees}
+                estimateMode={estimateMode}
               />
               {!isCollapsed && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-3">
@@ -470,6 +476,7 @@ export function BoardSwimlanes({
                       onStatusChange={onMoveTask}
                       recentlyUpdated={isRecent(t)}
                       fadedByOverlay={sinceMs != null}
+                      estimateMode={estimateMode}
                     />
                   ))}
                 </div>
@@ -486,6 +493,7 @@ export function BoardSwimlanes({
               collapsed={collapsed.has("__other__")}
               onToggleCollapse={() => toggle("__other__")}
               fallbackLabel="Other Issues"
+              estimateMode={estimateMode}
             />
             {!collapsed.has("__other__") && (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-3">
@@ -499,6 +507,7 @@ export function BoardSwimlanes({
                     onStatusChange={onMoveTask}
                     recentlyUpdated={isRecent(t)}
                     fadedByOverlay={sinceMs != null}
+                    estimateMode={estimateMode}
                   />
                 ))}
               </div>

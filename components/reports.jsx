@@ -11,6 +11,7 @@ import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { useBurndown, useVelocity } from "@/lib/hooks/use-openproject-detail";
 import { workingDaySet } from "@/lib/openproject/working-days";
 import { formatEstimate, sourceOf, weightOf } from "@/lib/openproject/estimate";
+import { ratioOf } from "@/lib/openproject/task-state";
 import { safeParseISO } from "@/lib/utils";
 import { usePublicConfig } from "@/components/config-provider";
 
@@ -546,9 +547,9 @@ function SprintReport({ projectId, sprint, sprintTasks, mode = "numeric" }) {
   // closed *while in this sprint*, including ones that have since been moved
   // to a follow-up sprint. Falling back to a current-membership scan would
   // collapse to 100% the moment undone work is rolled to the next sprint.
-  const fallbackCompletedPts = sprintTasks
-    .filter((t) => t.statusIsClosed)
-    .reduce((s, t) => s + weightOf(t, { mode }), 0);
+  const fallbackCompletedPts = Math.round(
+    sprintTasks.reduce((s, t) => s + weightOf(t, { mode }) * ratioOf(t), 0),
+  );
   const completedPts =
     q.data?.completed?.points != null
       ? q.data.completed.points
@@ -1055,20 +1056,27 @@ function MemberContribution({ tasks, scopeLabel, unit = "pts", mode = "numeric" 
       })();
       target.committed += pts;
       target.committedCount += 1;
-      if (t.statusIsClosed) {
-        target.completed += pts;
-        target.completedCount += 1;
-      } else {
-        // Open work that already carries an estimate is "in flight". This
-        // replaces the old keyword-derived progress/review buckets — open
-        // is open, no further inference.
-        if (pts > 0) target.inFlight += pts;
+      const ratio = ratioOf(t);
+      if (ratio > 0) {
+        target.completed += pts * ratio;
+        target.completedCount += ratio;
+      }
+      if (ratio < 1) {
+        // Remaining in-flight effort for open/partially-done work.
+        const remaining = pts * (1 - ratio);
+        if (remaining > 0) target.inFlight += remaining;
       }
     }
-    const sorted = Array.from(byAssignee.values()).sort(
-      (a, b) => b.completed - a.completed || b.committed - a.committed,
-    );
-    return { rows: sorted, unassigned: un.committedCount > 0 ? un : null };
+    const round = (r) => ({
+      ...r,
+      completed: Math.round(r.completed),
+      completedCount: Math.round(r.completedCount),
+      inFlight: Math.round(r.inFlight),
+    });
+    const sorted = Array.from(byAssignee.values())
+      .map(round)
+      .sort((a, b) => b.completed - a.completed || b.committed - a.committed);
+    return { rows: sorted, unassigned: un.committedCount > 0 ? round(un) : null };
   })();
 
   const allRows = unassigned ? [...rows, unassigned] : rows;
@@ -1277,10 +1285,12 @@ function TypeBreakdown({ tasks }) {
         done: 0,
       };
       ent.total += 1;
-      if (t.statusIsClosed) ent.done += 1;
+      ent.done += ratioOf(t);
       acc.set(key, ent);
     }
-    return [...acc.values()].sort((a, b) => b.total - a.total || a.label.localeCompare(b.label));
+    return [...acc.values()]
+      .map((r) => ({ ...r, done: Math.round(r.done) }))
+      .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label));
   })();
   const max = Math.max(1, ...rows.map((r) => r.total));
   const totalIssues = rows.reduce((s, r) => s + r.total, 0);
@@ -1365,9 +1375,9 @@ function KpiRow({ projectId, sprint, sprintTasks, allTasks, velocity, unit = "pt
     }
     // Fallback while burndown is loading or unavailable.
     const totalPts = sprintTasks.reduce((s, t) => s + weightOf(t, wOpts), 0);
-    const donePts = sprintTasks
-      .filter((t) => t.statusIsClosed)
-      .reduce((s, t) => s + weightOf(t, wOpts), 0);
+    const donePts = Math.round(
+      sprintTasks.reduce((s, t) => s + weightOf(t, wOpts) * ratioOf(t), 0),
+    );
     const sized = sprintTasks.reduce(
       (n, t) => (sourceOf(t, wOpts) ? n + 1 : n),
       0,

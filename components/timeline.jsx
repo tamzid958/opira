@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingPill } from "@/components/ui/loading-pill";
 import { PEOPLE } from "@/lib/data";
 import { findById, safeParseISO as safeISO } from "@/lib/utils";
+import { ratioOf } from "@/lib/openproject/task-state";
 
 // ─── Layout constants ────────────────────────────────────────────
 const ZOOM = {
@@ -191,11 +192,11 @@ function progressOf(tasks) {
   if (!tasks?.length) return { pct: 0, done: 0, total: 0 };
   let done = 0;
   for (const t of tasks) {
-    if (t.statusIsClosed) done += 1;
+    done += ratioOf(t);
   }
   return {
     pct: Math.round((done / tasks.length) * 100),
-    done,
+    done: Math.round(done),
     total: tasks.length,
   };
 }
@@ -254,7 +255,7 @@ function TaskBar({ task, rangeStart, dayPx, assignees, onClick }) {
   const klass = tint
     ? "ring-1 ring-inset"
     : "bg-status-todo-bg text-status-todo-fg";
-  const pct = task.statusIsClosed ? 100 : 0;
+  const pct = Math.round(ratioOf(task) * 100);
   const showAvatar = width >= 60 && avatar;
   const showLabel = width >= 80;
   return (

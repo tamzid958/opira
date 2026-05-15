@@ -35,6 +35,8 @@ import { useSavedViews } from "@/lib/hooks/use-saved-views";
 import { pickSprintByDate } from "@/lib/hooks/use-active-sprint";
 import { friendlyError } from "@/lib/api-client";
 import { findById } from "@/lib/utils";
+import { useEstimateMode } from "@/lib/hooks/use-estimate-mode";
+import { inferModeFromTasks } from "@/lib/openproject/estimate";
 
 export default function BoardPage({ params: paramsPromise }) {
   const { projectId } = use(paramsPromise);
@@ -239,7 +241,10 @@ export default function BoardPage({ params: paramsPromise }) {
   const sprintScope =
     sprintFilter === "all" ? null : sprintFilter === "backlog" ? "backlog" : sprintFilter;
   const tasksQ = useTasks(projectId, sprintScope, configured && !!projectId);
-  const tasks = tasksQ.data || [];
+  const tasks = useMemo(() => tasksQ.data || [], [tasksQ.data]);
+  const estimateModeQ = useEstimateMode(projectId);
+  const inferredMode = useMemo(() => inferModeFromTasks(tasks) || "numeric", [tasks]);
+  const estimateMode = estimateModeQ.isLoading ? inferredMode : estimateModeQ.mode || "numeric";
 
   // Gate the page body on EVERY query the page reads — filter chips, sprint
   // selector, and the board itself all derive labels from these. Rendering
@@ -951,6 +956,7 @@ export default function BoardPage({ params: paramsPromise }) {
             onMoveTask={moveTaskByStatusId}
             onUpdate={updateTask}
             updatedSince={updatedSince}
+            estimateMode={estimateMode}
           />
         ) : view === "swimlanes" ? (
           <BoardSwimlanes
@@ -960,6 +966,7 @@ export default function BoardPage({ params: paramsPromise }) {
             onTaskClick={(id) => setParams({ wp: id })}
             onUpdate={updateTask}
             updatedSince={updatedSince}
+            estimateMode={estimateMode}
           />
         ) : (
           <Board

@@ -395,6 +395,7 @@ export function Board({
   showBacklogDropzone = false,
 }) {
   const [activeId, setActiveId] = useState(null);
+  const activeIdRef = useRef(null);
   const [overStatusId, setOverStatusId] = useState(null);
   const [overBacklog, setOverBacklog] = useState(false);
   // Set of status ids the active card may transition into (per OP's
@@ -806,8 +807,9 @@ export function Board({
     <DndContext
       sensors={sensors}
       onDragStart={(e) => {
-        setActiveId(e.active.id);
         const wpId = e.active.id;
+        setActiveId(wpId);
+        activeIdRef.current = wpId;
         const cached = allowedCacheRef.current.get(wpId);
         if (cached !== undefined) {
           setAllowedStatusIds(cached);
@@ -824,10 +826,11 @@ export function Board({
             // Cache that signal as `null` — the server is the authority.
             const set = Array.isArray(res?.ids) ? new Set(res.ids.map(String)) : null;
             allowedCacheRef.current.set(wpId, set);
-            setActiveId((current) => {
-              if (current === wpId) setAllowedStatusIds(set);
-              return current;
-            });
+            // Use a ref instead of a setActiveId functional-update to read
+            // current drag state — avoids a spurious Board re-render mid-drag
+            // that caused draggable node positions to shift and cards to be
+            // dropped onto the wrong column.
+            if (activeIdRef.current === wpId) setAllowedStatusIds(set);
           })
           .catch(() => {
             // Swallow — fall back to letting the server reject the drop.
@@ -872,6 +875,7 @@ export function Board({
                 toast.error(err?.message || "Couldn't move to backlog"),
               );
           }
+          activeIdRef.current = null;
           setActiveId(null);
           setOverStatusId(null);
           setOverBacklog(false);
@@ -912,12 +916,14 @@ export function Board({
             }
           }
         }
+        activeIdRef.current = null;
         setActiveId(null);
         setOverStatusId(null);
         setOverBacklog(false);
         setAllowedStatusIds(null);
       }}
       onDragCancel={() => {
+        activeIdRef.current = null;
         setActiveId(null);
         setOverStatusId(null);
         setOverBacklog(false);

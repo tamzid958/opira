@@ -17,12 +17,14 @@ import {
   TaskTypeIcon,
 } from "@/components/ui/task-meta";
 import { Menu } from "@/components/ui/menu";
+import { ParentPicker } from "@/components/ui/parent-picker";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TagPill } from "@/components/ui/tag-pill";
 import { Icon } from "@/components/icons";
 import { CarryOverChip } from "@/components/ui/carryover-chip";
 import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { formatEstimate, weightOf } from "@/lib/openproject/estimate";
+import { ratioOf } from "@/lib/openproject/task-state";
 import { PEOPLE } from "@/lib/data";
 import { cn, findById, formatAbsDate } from "@/lib/utils";
 import { buildChildIndex, rootsOf } from "@/lib/openproject/hierarchy";
@@ -89,6 +91,7 @@ function BacklogRow({
   onStatusChange,
   onAssigneeChange,
   carryOver,
+  estimateMode = "numeric",
 }) {
   const assigneeList = Array.isArray(assignees) ? assignees : [];
   const assignee =
@@ -208,7 +211,7 @@ function BacklogRow({
         title={`${task.points || 0} story points`}
         className="backlog-cell-md justify-self-center px-2 py-0.5 rounded-full bg-surface-muted text-[11px] font-medium text-fg-muted text-center min-w-9"
       >
-        {formatEstimate(task) ?? "—"}
+        {formatEstimate(task, { mode: estimateMode }) ?? "—"}
       </span>
       <span
         className="backlog-cell-md text-xs text-fg-subtle tabular-nums truncate"
@@ -375,6 +378,7 @@ function BacklogSection({
   onCreate,
   velocity = null,
   estimateUnit = "pts",
+  estimateMode = "numeric",
   focusedId = null,
   carryoverByWpId,
 }) {
@@ -445,9 +449,8 @@ function BacklogSection({
   const dropId = sprint ? sprint.id : "backlog";
   const { setNodeRef } = useDroppable({ id: dropId });
 
-  // Count open vs. done by API truth — `statusIsClosed` comes from
-  // `/statuses[*].isClosed`, populated by the mapper.
-  const doneCount = tasks.filter((t) => t.statusIsClosed).length;
+  // Count done weighted by status defaultDoneRatio (partial completion allowed).
+  const doneCount = Math.round(tasks.reduce((s, t) => s + ratioOf(t), 0));
   const totalPts = tasks.reduce((sum, t) => sum + weightOf(t), 0);
   const unassigned = tasks.filter((t) => !t.assignee).length;
   const allSelected = tasks.length > 0 && tasks.every((t) => selected.has(t.id));
@@ -651,6 +654,7 @@ function BacklogSection({
                 onStatusChange,
                 onAssigneeChange,
                 carryoverByWpId,
+                estimateMode,
               }}
             />
           ))}
@@ -736,6 +740,20 @@ function isBacklogSprint(sprint) {
   return String(sprint?.name || "").trim().toLowerCase() === "backlog";
 }
 
+function BulkBarButton({ icon, label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl hover:bg-surface-subtle cursor-pointer transition-colors group"
+    >
+      <Icon name={icon} size={14} aria-hidden="true" className="text-fg/70 group-hover:text-fg transition-colors" />
+      <span className="text-[10px] font-medium leading-none text-fg/50 group-hover:text-fg/80 transition-colors">{label}</span>
+    </button>
+  );
+}
+
+
 export function Backlog({
   tasks,
   statuses,
@@ -744,6 +762,7 @@ export function Backlog({
   manageVersions = { allowed: true, loading: false },
   canCreate = true,
   currentUserId,
+  projectId,
   pinnedSprintId = null,
   onTaskClick,
   onMoveTask,
@@ -761,11 +780,13 @@ export function Backlog({
   onBulkAssign,
   onBulkSetType,
   onBulkAddLabel,
+  onBulkSetParent,
   onBulkDelete,
   types = [],
   categories = [],
   velocity = null,
   estimateUnit = "pts",
+  estimateMode = "numeric",
   carryover,
 }) {
   const [overId, setOverId] = useState(null);
@@ -774,6 +795,7 @@ export function Backlog({
   const [typeMenu, setTypeMenu] = useState(null);
   const [labelMenu, setLabelMenu] = useState(null);
   const [assignMenu, setAssignMenu] = useState(null);
+  const [parentPickerAnchor, setParentPickerAnchor] = useState(null);
   const [sprintPageIndex, setSprintPageIndex] = useState(0);
   // Keyboard-nav focused row id. j / k / arrow up/down moves focus through
   // the visible rows in DOM order; Enter opens, x toggles selection. The
@@ -993,6 +1015,7 @@ export function Backlog({
               canCreate={canCreate}
               velocity={velocity}
               estimateUnit={estimateUnit}
+              estimateMode={estimateMode}
               focusedId={focusedId}
               selected={selected}
               onSelectChange={onSelectChange}
@@ -1075,6 +1098,7 @@ export function Backlog({
               canCreate={canCreate}
               velocity={velocity}
               estimateUnit={estimateUnit}
+              estimateMode={estimateMode}
               focusedId={focusedId}
               selected={selected}
               onSelectChange={onSelectChange}
@@ -1109,6 +1133,7 @@ export function Backlog({
           canCreate={canCreate}
           selected={selected}
           estimateUnit={estimateUnit}
+          estimateMode={estimateMode}
           focusedId={focusedId}
           onSelectChange={onSelectChange}
           onSelectAll={onSelectAll}
@@ -1125,90 +1150,99 @@ export function Backlog({
       {/* Bulk action bar — glass surface so it floats over the rows
           without obscuring the work behind it. */}
       {selected.size > 0 && (
-        <div className="glass fixed left-1/2 -translate-x-1/2 bottom-6 z-100 flex items-center gap-2 flex-wrap justify-center px-4 py-2 rounded-xl text-fg shadow-lg animate-slide-up max-w-[calc(100vw-32px)]">
-          <span className="text-[13px] font-semibold">{selected.size} selected</span>
-          <span className="w-px h-5 bg-border" />
-          <button
-            type="button"
-            onClick={(e) =>
-              setMoveMenu(e.currentTarget.getBoundingClientRect())
-            }
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[13px] font-medium hover:bg-surface-subtle cursor-pointer"
-          >
-            <Icon name="sprint" size={13} aria-hidden="true" />
-            Move to…
-          </button>
-          <button
-            type="button"
-            onClick={(e) =>
-              setAssignMenu(e.currentTarget.getBoundingClientRect())
-            }
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[13px] font-medium hover:bg-surface-subtle cursor-pointer"
-          >
-            <Icon name="people" size={13} aria-hidden="true" />
-            Assign…
-          </button>
+        <div className="glass fixed left-1/2 -translate-x-1/2 bottom-6 z-100 flex items-center gap-1 px-2 py-1.5 rounded-2xl text-fg shadow-xl animate-slide-up border border-border/60 max-w-[calc(100vw-32px)]">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-accent/15 mr-1">
+            <span className="text-[12px] font-bold tabular-nums text-accent">{selected.size}</span>
+            <span className="text-[11px] text-fg/50 font-medium">selected</span>
+          </div>
+
+          <BulkBarButton
+            icon="sprint"
+            label="Sprint"
+            onClick={(e) => setMoveMenu(e.currentTarget.getBoundingClientRect())}
+          />
+          <BulkBarButton
+            icon="people"
+            label="Assignee"
+            onClick={(e) => setAssignMenu(e.currentTarget.getBoundingClientRect())}
+          />
+          {onBulkSetParent && (
+            <BulkBarButton
+              icon="link"
+              label="Parent"
+              onClick={(e) => setParentPickerAnchor(e.currentTarget.getBoundingClientRect())}
+            />
+          )}
           {onBulkSetType && types.length > 0 && (
-            <button
-              type="button"
-              onClick={(e) =>
-                setTypeMenu(e.currentTarget.getBoundingClientRect())
-              }
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[13px] font-medium hover:bg-surface-subtle cursor-pointer"
-            >
-              <Icon name="epic" size={13} aria-hidden="true" />
-              Type…
-            </button>
+            <BulkBarButton
+              icon="epic"
+              label="Type"
+              onClick={(e) => setTypeMenu(e.currentTarget.getBoundingClientRect())}
+            />
           )}
           {onBulkAddLabel && categories.length > 0 && (
-            <button
-              type="button"
-              onClick={(e) =>
-                setLabelMenu(e.currentTarget.getBoundingClientRect())
-              }
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[13px] font-medium hover:bg-surface-subtle cursor-pointer"
-            >
-              <Icon name="tag" size={13} aria-hidden="true" />
-              Label…
-            </button>
+            <BulkBarButton
+              icon="tag"
+              label="Label"
+              onClick={(e) => setLabelMenu(e.currentTarget.getBoundingClientRect())}
+            />
           )}
           {currentUserId && (
-            <button
-              type="button"
+            <BulkBarButton
+              icon="check"
+              label="Assign me"
               onClick={() => {
                 onBulkAssign?.([...selected], currentUserId);
                 clearSelection();
               }}
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[13px] font-medium hover:bg-surface-subtle cursor-pointer"
-            >
-              Assign to me
-            </button>
+            />
           )}
           {onBulkDelete && (
             <>
-              <span className="w-px h-5 bg-border" />
+              <span className="w-px h-5 bg-border/60 mx-0.5" />
               <button
                 type="button"
                 onClick={() => {
                   const ids = [...selected];
                   onBulkDelete(ids, () => clearSelection());
                 }}
-                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[13px] font-medium text-red-200 hover:bg-red-500/30 hover:text-white cursor-pointer"
-                title="Delete selected work packages"
+                className="inline-flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-red-400 hover:bg-red-500/15 hover:text-red-300 cursor-pointer transition-colors"
+                title="Delete selected"
               >
-                <Icon name="trash" size={13} aria-hidden="true" />
-                Delete
+                <Icon name="trash" size={14} aria-hidden="true" />
+                <span className="text-[10px] font-medium leading-none">Delete</span>
               </button>
             </>
           )}
+
+          <span className="w-px h-5 bg-border/60 mx-0.5" />
           <button
             type="button"
             onClick={clearSelection}
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[13px] font-medium hover:bg-surface-subtle cursor-pointer"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-xl text-fg/40 hover:bg-surface-subtle hover:text-fg cursor-pointer transition-colors"
             title="Clear selection"
           >
             <Icon name="x" size={13} aria-hidden="true" />
           </button>
+
+          {parentPickerAnchor && onBulkSetParent && (
+            <ParentPicker
+              projectId={projectId}
+              value={null}
+              valueName={null}
+              initialAnchorRect={parentPickerAnchor}
+              onChange={(id, name) => {
+                if (id) {
+                  onBulkSetParent([...selected], id, name);
+                  clearSelection();
+                }
+                setParentPickerAnchor(null);
+              }}
+              triggerClassName="sr-only"
+            >
+              {() => null}
+            </ParentPicker>
+          )}
           {moveMenu && (
             <Menu
               anchorRect={moveMenu}

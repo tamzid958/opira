@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { id: "board", label: "Board", icon: "board" },
   { id: "backlog", label: "Backlog", icon: "backlog" },
   { id: "timeline", label: "Timeline", icon: "calendar" },
+  { id: "milestones", label: "Milestones", icon: "flag" },
   { id: "documents", label: "Documents", icon: "paperclip" },
   { id: "reports", label: "Reports", icon: "chart" },
   { id: "tags", label: "Tags", icon: "tag" },

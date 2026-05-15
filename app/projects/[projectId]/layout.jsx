@@ -17,6 +17,7 @@ import {
 import {
   useApiStatus,
   useCreateTask,
+  useDeleteTask,
   usePriorities,
   useProjects,
   useSprints,
@@ -26,6 +27,7 @@ import {
   useUpdateTask,
   useUsers,
 } from "@/lib/hooks/use-openproject";
+import { runBatched } from "@/lib/openproject/resolve-patch";
 import {
   useAvailableAssignees,
   useCategories,
@@ -35,6 +37,7 @@ import { usePermission } from "@/lib/hooks/use-permissions";
 import { PERM } from "@/lib/openproject/permission-keys";
 import { resolveApiPatch } from "@/lib/openproject/resolve-patch";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
+import { pickSprintByDate } from "@/lib/hooks/use-active-sprint";
 import { syncPeople, syncProjects } from "@/lib/data";
 import { friendlyError } from "@/lib/api-client";
 
@@ -50,7 +53,6 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
 
   const wpId = urlParams.get("wp") || null;
   const createOpen = urlParams.get("create") === "1";
-  const createDefaultSprint = urlParams.get("createSprint") || null;
   const createDefaultStatus = urlParams.get("createStatus") || null;
 
   const status = useApiStatus();
@@ -60,6 +62,11 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
   const projectsQ = useProjects(configured);
   const usersQ = useUsers(configured);
   const sprintsQ = useSprints(projectId, configured && !!projectId);
+
+  const createDefaultSprint =
+    urlParams.get("createSprint") ||
+    pickSprintByDate(sprintsQ.data || [])?.id ||
+    null;
   const tasksQ = useTasks(projectId, configured && !!projectId);
   const statusesQ = useStatuses(configured);
   const typesQ = useTypes(projectId, configured && !!projectId);
@@ -68,6 +75,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
   const assigneesQ = useAvailableAssignees(projectId, configured && !!projectId);
 
   const updateTaskMutation = useUpdateTask(projectId);
+  const deleteTaskMutation = useDeleteTask(projectId);
   const createTaskMutation = useCreateTask();
   const canCreateIssue = usePermission(projectId, PERM.ADD_WORK_PACKAGES);
 
@@ -120,6 +128,64 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
       }),
     });
 
+  // runBatched calls mutateAsync(id, patch) with two args, but useUpdateTask
+  // expects a single { id, patch } object — wrap it to bridge the shapes.
+  const subtaskUpdateAsync = useCallback(
+    (id, patch) => updateTaskMutation.mutateAsync({ id, patch }),
+    [updateTaskMutation.mutateAsync],
+  );
+
+  const subtaskBulkMoveSprint = useCallback(async (ids, sprintId) => {
+    const sprints = sprintsQ.data ?? [];
+    const target = sprintId
+      ? sprints.find((s) => s.id === sprintId)?.name?.split(" — ")[0] || "sprint"
+      : "backlog";
+    const pending = toast.loading(`Moving ${ids.length} sub-task${ids.length === 1 ? "" : "s"} to ${target}…`);
+    const { ok, gone, failed } = await runBatched(ids, subtaskUpdateAsync, () => ({ sprint: sprintId }));
+    toast.dismiss(pending);
+    if (failed > 0) toast.error(`Moved ${ok + gone} of ${ids.length}. ${failed} failed.`);
+    else toast.success(`Moved ${ok + gone} sub-task${ok + gone === 1 ? "" : "s"} to ${target}`);
+  }, [sprintsQ.data, subtaskUpdateAsync]);
+
+  const subtaskBulkAssign = useCallback(async (ids, assigneeId) => {
+    const verb = assigneeId ? "Assigning" : "Unassigning";
+    const pending = toast.loading(`${verb} ${ids.length} sub-task${ids.length === 1 ? "" : "s"}…`);
+    const { ok, gone, failed } = await runBatched(ids, subtaskUpdateAsync, () => ({ assignee: assigneeId }));
+    toast.dismiss(pending);
+    if (failed > 0) toast.error(`Updated ${ok + gone} of ${ids.length}. ${failed} failed.`);
+    else toast.success(assigneeId ? `Assigned ${ok + gone} sub-task${ok + gone === 1 ? "" : "s"}` : `Unassigned ${ok + gone} sub-task${ok + gone === 1 ? "" : "s"}`);
+  }, [subtaskUpdateAsync]);
+
+  const subtaskBulkSetParent = useCallback(async (ids, parentId, parentName) => {
+    const pending = toast.loading(`Setting parent for ${ids.length} sub-task${ids.length === 1 ? "" : "s"}…`);
+    const { ok, gone, failed } = await runBatched(ids, subtaskUpdateAsync, () => ({ parent: parentId }));
+    toast.dismiss(pending);
+    if (failed > 0) toast.error(`Updated ${ok + gone} of ${ids.length}. ${failed} failed.`);
+    else toast.success(`${ok + gone} sub-task${ok + gone === 1 ? "" : "s"} → ${parentName || "new parent"}`);
+  }, [subtaskUpdateAsync]);
+
+  const subtaskBulkSetType = useCallback(async (ids, typeId) => {
+    const typeName = typesQ.data?.find((t) => String(t.id) === String(typeId))?.name || typeId;
+    const pending = toast.loading(`Updating type for ${ids.length} sub-task${ids.length === 1 ? "" : "s"}…`);
+    const { ok, gone, failed } = await runBatched(ids, subtaskUpdateAsync, () => ({ typeId }));
+    toast.dismiss(pending);
+    if (failed > 0) toast.error(`Updated ${ok + gone} of ${ids.length}. ${failed} failed.`);
+    else toast.success(`${ok + gone} sub-task${ok + gone === 1 ? "" : "s"} → ${typeName}`);
+  }, [typesQ.data, subtaskUpdateAsync]);
+
+  const subtaskBulkDelete = useCallback((ids, clearSelection) => {
+    if (!ids?.length) return;
+    if (!window.confirm(`Delete ${ids.length} sub-task${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    const pending = toast.loading(`Deleting ${ids.length} sub-task${ids.length === 1 ? "" : "s"}…`);
+    Promise.allSettled(ids.map((id) => deleteTaskMutation.mutateAsync(id))).then((results) => {
+      toast.dismiss(pending);
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) toast.error(`Deleted ${ids.length - failed} of ${ids.length}. ${failed} failed.`);
+      else toast.success(`Deleted ${ids.length} sub-task${ids.length === 1 ? "" : "s"}`);
+      clearSelection?.();
+    });
+  }, [deleteTaskMutation]);
+
   const closeWp = useCallback(() => setParams({ wp: null }), [setParams]);
   const closeCreate = useCallback(
     () => setParams({ create: null, createSprint: null, createStatus: null }),
@@ -154,6 +220,11 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
         assignee: data.assignee,
         sprint: data.sprint,
         categoryIds: data.categoryIds,
+        points: data.points ?? null,
+        pointsHref: data.pointsHref ?? null,
+        parent: data.epic ?? null,
+        startDate: data.startDate ?? null,
+        dueDate: data.dueDate ?? null,
       },
       {
         onSuccess: (created) => {
@@ -301,6 +372,11 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
           onUpdate={updateTask}
           onChange={(msg) => toast.success(msg)}
           onSelectTask={(id) => setParams({ wp: id })}
+          onSubtaskBulkMoveSprint={subtaskBulkMoveSprint}
+          onSubtaskBulkAssign={subtaskBulkAssign}
+          onSubtaskBulkSetType={subtaskBulkSetType}
+          onSubtaskBulkSetParent={subtaskBulkSetParent}
+          onSubtaskBulkDelete={subtaskBulkDelete}
         />
       )}
       {createOpen && (
@@ -308,6 +384,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
           onClose={closeCreate}
           onCreate={createIssue}
           projectName={project?.name}
+          projectId={projectId}
           defaultSprint={createDefaultSprint}
           defaultStatus={createDefaultStatus}
           categories={categoriesQ.data || []}

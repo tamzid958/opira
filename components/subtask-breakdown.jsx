@@ -1,6 +1,6 @@
 "use client";
 
-import { useImperativeHandle, useState } from "react";
+import { useCallback, useImperativeHandle, useState } from "react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
 import { Avatar } from "@/components/ui/avatar";
@@ -9,11 +9,12 @@ import { Menu } from "@/components/ui/menu";
 import { Icon } from "@/components/icons";
 import { useCreateChild } from "@/lib/hooks/use-openproject-detail";
 import { useUpdateTask } from "@/lib/hooks/use-openproject";
-import { PEOPLE } from "@/lib/data";
 import { buildChildIndex as buildSliceChildIndex } from "@/lib/openproject/hierarchy";
 import { assigneeMenuItems, statusMenuItems } from "@/lib/openproject/menu-items";
 import { weightOf } from "@/lib/openproject/estimate";
+import { ratioOf } from "@/lib/openproject/task-state";
 import { cn, findById } from "@/lib/utils";
+import { ParentPicker } from "@/components/ui/parent-picker";
 
 const buildChildIndex = (allTasks) =>
   buildSliceChildIndex(allTasks, { filterToSlice: false });
@@ -50,30 +51,10 @@ function SubtaskRow({
     updateTask.mutate({ id: task.id, patch });
   };
 
-  // Flip between the project's first open and first closed status using
-  // the API-truth `isClosed` flag (sorted by `position` so the choice is
-  // stable across installs).
-  const toggleDone = () => {
-    const list = (Array.isArray(statuses) ? statuses : [])
-      .slice()
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-    const target = list.find((s) => (isDone ? !s.isClosed : s.isClosed));
-    if (!target) {
-      onChange?.(
-        isDone
-          ? "No open status configured in OpenProject"
-          : "No closed status configured in OpenProject",
-      );
-      return;
-    }
-    updateSub({ statusId: target.id, statusName: target.name });
-    onChange?.(isDone ? "Sub-task reopened" : "Sub-task completed");
-  };
-
   return (
     <>
       <div
-        className="grid grid-cols-[16px_16px_100px_minmax(0,1fr)_100px_minmax(80px,140px)_28px_28px] gap-2 items-center -mx-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-subtle transition-colors"
+        className="grid grid-cols-[16px_100px_minmax(0,1fr)_100px_minmax(80px,140px)_28px_28px] gap-2 items-center -mx-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-subtle transition-colors"
         style={{ paddingLeft: 8 + depth * 20 }}
       >
         <span
@@ -90,34 +71,6 @@ function SubtaskRow({
           }`}
         >
           <Icon name={expanded ? "chev-down" : "chev-right"} size={12} aria-hidden="true" />
-        </span>
-
-        <span
-          onClick={(e) => {
-            if (!editable) return;
-            e.stopPropagation();
-            toggleDone();
-          }}
-          role="checkbox"
-          aria-checked={isDone}
-          aria-label={isDone ? "Mark as not done" : "Mark as done"}
-          title={
-            !editable
-              ? "You don't have permission to update this sub-task"
-              : isDone
-              ? "Mark as not done"
-              : "Mark as done"
-          }
-          aria-disabled={!editable || undefined}
-          className={cn(
-            "w-4 h-4 rounded grid place-items-center text-white transition-colors",
-            editable ? "cursor-pointer" : "cursor-default",
-            isDone
-              ? "bg-status-done border-[1.5px] border-status-done"
-              : "border-[1.5px] border-border-strong hover:border-status-done",
-          )}
-        >
-          {isDone && <Icon name="check" size={11} aria-hidden="true" />}
         </span>
 
         <span className="font-mono text-[11px] text-fg-subtle truncate">{task.key}</span>
@@ -288,22 +241,59 @@ function SubtaskRow({
 
 const PAGE_SIZE = 10;
 
+function BulkBarButton({ icon, label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl hover:bg-surface-subtle cursor-pointer transition-colors group"
+    >
+      <Icon name={icon} size={14} aria-hidden="true" className="text-fg/70 group-hover:text-fg transition-colors" />
+      <span className="text-[10px] font-medium leading-none text-fg/50 group-hover:text-fg/80 transition-colors">{label}</span>
+    </button>
+  );
+}
+
 export function SubtaskBreakdown({
   parent,
   projectId,
   statuses = [],
   assignees = [],
   sprints = [],
+  types = [],
   canCreate = true,
+  currentUserId,
   onChange,
   onTaskClick,
   allTasks = [],
+  onBulkMoveSprint,
+  onBulkAssign,
+  onBulkSetType,
+  onBulkSetParent,
+  onBulkDelete,
   ref,
 }) {
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [newTypeId, setNewTypeId] = useState(null);
+  const [typePickerAnchor, setTypePickerAnchor] = useState(null);
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkMoveMenu, setBulkMoveMenu] = useState(null);
+  const [bulkAssignMenu, setBulkAssignMenu] = useState(null);
+  const [bulkTypeMenu, setBulkTypeMenu] = useState(null);
+  const [bulkParentAnchor, setBulkParentAnchor] = useState(null);
   const createChild = useCreateChild(parent.nativeId);
+
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+  const toggleSelected = useCallback((id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   useImperativeHandle(ref, () => ({
     startAdd: () => setAdding(true),
@@ -332,11 +322,15 @@ export function SubtaskBreakdown({
   })();
 
   const totalCount = subtree.length;
-  const doneCount = subtree.filter((t) => t.statusIsClosed).length;
+  const doneCount = subtree.reduce((s, t) => s + ratioOf(t), 0);
   const totalPts = subtree.reduce((s, t) => s + weightOf(t), 0);
-  const donePts = subtree
-    .filter((t) => t.statusIsClosed)
-    .reduce((s, t) => s + weightOf(t), 0);
+  const donePts = subtree.reduce((s, t) => s + weightOf(t) * ratioOf(t), 0);
+
+  const resolvedTypeId = newTypeId ?? types[0]?.id ?? null;
+  const resolvedTypeName =
+    types.find((t) => String(t.id) === String(resolvedTypeId))?.name ||
+    types[0]?.name ||
+    "Task";
 
   const addSub = async () => {
     if (!newTitle.trim()) {
@@ -344,13 +338,18 @@ export function SubtaskBreakdown({
       return;
     }
     try {
-      await createChild.mutateAsync({ title: newTitle.trim(), projectId });
+      await createChild.mutateAsync({
+        title: newTitle.trim(),
+        projectId,
+        ...(resolvedTypeId != null ? { typeId: resolvedTypeId } : {}),
+      });
       onChange?.("Sub-task added");
       setPage(Math.max(1, Math.ceil((directChildren.length + 1) / PAGE_SIZE)));
     } catch (e) {
       toast.error(friendlyError(e, "Couldn't create sub-task — please try again."));
     }
     setNewTitle("");
+    setNewTypeId(null);
     setAdding(false);
   };
 
@@ -361,7 +360,7 @@ export function SubtaskBreakdown({
           Sub-tasks
           {totalCount > 0 && (
             <span className="text-fg-subtle font-medium text-xs">
-              {doneCount}/{totalCount} · {donePts}/{totalPts} pts
+              {Math.round(doneCount)}/{totalCount} · {Math.round(donePts)}/{Math.round(totalPts)} pts
             </span>
           )}
         </span>
@@ -388,18 +387,37 @@ export function SubtaskBreakdown({
 
       <div className="flex flex-col gap-px mt-1">
         {pageChildren.map((c) => (
-          <SubtaskRow
-            key={c.id}
-            task={c}
-            depth={0}
-            childIndex={childIndex}
-            statuses={statuses}
-            assignees={assignees}
-            sprints={sprints}
-            projectId={projectId}
-            onChange={onChange}
-            onTaskClick={onTaskClick}
-          />
+          <div key={c.id} className="flex items-start gap-1.5">
+            {directChildren.length > 1 && (
+              <span
+                role="checkbox"
+                aria-checked={selected.has(c.id)}
+                aria-label={`Select ${c.title}`}
+                onClick={(e) => { e.stopPropagation(); toggleSelected(c.id); }}
+                className={cn(
+                  "mt-[13px] w-4 h-4 rounded flex-shrink-0 grid place-items-center border cursor-pointer transition-colors",
+                  selected.has(c.id)
+                    ? "bg-accent border-accent text-white"
+                    : "border-border hover:border-accent",
+                )}
+              >
+                {selected.has(c.id) && <Icon name="check" size={9} aria-hidden="true" />}
+              </span>
+            )}
+            <div className="flex-1 min-w-0">
+              <SubtaskRow
+                task={c}
+                depth={0}
+                childIndex={childIndex}
+                statuses={statuses}
+                assignees={assignees}
+                sprints={sprints}
+                projectId={projectId}
+                onChange={onChange}
+                onTaskClick={onTaskClick}
+              />
+            </div>
+          </div>
         ))}
       </div>
 
@@ -437,7 +455,37 @@ export function SubtaskBreakdown({
 
       {adding && canCreate && (
         <div className="flex items-center gap-2 -mx-2 mt-1 px-2 py-2 rounded-md bg-surface-subtle">
-          <Icon name="plus" size={14} className="text-fg-subtle" aria-hidden="true" />
+          <Icon name="plus" size={14} className="text-fg-subtle flex-shrink-0" aria-hidden="true" />
+          {types.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => setTypePickerAnchor(e.currentTarget.getBoundingClientRect())}
+                className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-[11px] font-medium bg-surface-muted hover:bg-surface text-fg-muted hover:text-fg border border-border flex-shrink-0 cursor-pointer transition-colors"
+                title="Choose work package type"
+              >
+                <Icon name="epic" size={10} aria-hidden="true" />
+                <span>{resolvedTypeName}</span>
+                <Icon name="chev-down" size={9} aria-hidden="true" className="text-fg-faint" />
+              </button>
+              {typePickerAnchor && (
+                <Menu
+                  anchorRect={typePickerAnchor}
+                  onClose={() => setTypePickerAnchor(null)}
+                  onSelect={(it) => {
+                    setNewTypeId(it.value);
+                    setTypePickerAnchor(null);
+                  }}
+                  width={180}
+                  items={types.map((t) => ({
+                    label: t.name,
+                    value: t.id,
+                    active: String(t.id) === String(resolvedTypeId),
+                  }))}
+                />
+              )}
+            </>
+          )}
           <input
             autoFocus
             placeholder="Sub-task title…"
@@ -448,13 +496,18 @@ export function SubtaskBreakdown({
               if (e.key === "Escape") {
                 setAdding(false);
                 setNewTitle("");
+                setNewTypeId(null);
               }
             }}
-            onBlur={addSub}
-            className="flex-1 bg-transparent border-0 outline-none text-[13px] text-fg h-6 placeholder:text-fg-faint"
+            onBlur={(e) => {
+              // Don't submit if focus moved to the type picker menu
+              if (typePickerAnchor) return;
+              addSub();
+            }}
+            className="flex-1 bg-transparent border-0 outline-none text-[13px] text-fg h-6 placeholder:text-fg-faint min-w-0"
           />
           {createChild.isPending && (
-            <span className="text-[11px] text-fg-faint">creating…</span>
+            <span className="text-[11px] text-fg-faint flex-shrink-0">creating…</span>
           )}
         </div>
       )}
@@ -462,6 +515,158 @@ export function SubtaskBreakdown({
       {!adding && directChildren.length === 0 && (
         <div className="text-center py-4 px-4 text-[13px] text-fg-subtle border border-dashed border-border rounded-lg mt-1">
           No sub-tasks yet. Break this down to track progress and split work across the team.
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="glass fixed left-1/2 -translate-x-1/2 bottom-6 z-100 flex items-center gap-1 px-2 py-1.5 rounded-2xl text-fg shadow-xl animate-slide-up border border-border/60 max-w-[calc(100vw-32px)]">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-accent/15 mr-1">
+            <span className="text-[12px] font-bold tabular-nums text-accent">{selected.size}</span>
+            <span className="text-[11px] text-fg/50 font-medium">selected</span>
+          </div>
+
+          {onBulkMoveSprint && (
+            <BulkBarButton
+              icon="sprint"
+              label="Sprint"
+              onClick={(e) => setBulkMoveMenu(e.currentTarget.getBoundingClientRect())}
+            />
+          )}
+          {onBulkAssign && (
+            <BulkBarButton
+              icon="people"
+              label="Assignee"
+              onClick={(e) => setBulkAssignMenu(e.currentTarget.getBoundingClientRect())}
+            />
+          )}
+          {onBulkSetParent && (
+            <BulkBarButton
+              icon="link"
+              label="Parent"
+              onClick={(e) => setBulkParentAnchor(e.currentTarget.getBoundingClientRect())}
+            />
+          )}
+          {onBulkSetType && types.length > 0 && (
+            <BulkBarButton
+              icon="epic"
+              label="Type"
+              onClick={(e) => setBulkTypeMenu(e.currentTarget.getBoundingClientRect())}
+            />
+          )}
+          {currentUserId && onBulkAssign && (
+            <BulkBarButton
+              icon="check"
+              label="Assign me"
+              onClick={() => {
+                onBulkAssign([...selected], currentUserId);
+                clearSelection();
+              }}
+            />
+          )}
+          {onBulkDelete && (
+            <>
+              <span className="w-px h-5 bg-border/60 mx-0.5" />
+              <button
+                type="button"
+                onClick={() => {
+                  onBulkDelete([...selected], clearSelection);
+                }}
+                className="inline-flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-red-400 hover:bg-red-500/15 hover:text-red-300 cursor-pointer transition-colors"
+                title="Delete selected"
+              >
+                <Icon name="trash" size={14} aria-hidden="true" />
+                <span className="text-[10px] font-medium leading-none">Delete</span>
+              </button>
+            </>
+          )}
+
+          <span className="w-px h-5 bg-border/60 mx-0.5" />
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="inline-flex items-center justify-center w-7 h-7 rounded-xl text-fg/40 hover:bg-surface-subtle hover:text-fg cursor-pointer transition-colors"
+            title="Clear selection"
+          >
+            <Icon name="x" size={13} aria-hidden="true" />
+          </button>
+
+          {bulkMoveMenu && (
+            <Menu
+              anchorRect={bulkMoveMenu}
+              onClose={() => setBulkMoveMenu(null)}
+              onSelect={(it) => {
+                onBulkMoveSprint?.([...selected], it.value);
+                clearSelection();
+              }}
+              items={[
+                { label: "Without sprint", value: null, icon: "backlog" },
+                { divider: true },
+                ...(Array.isArray(sprints) ? sprints : []).map((s) => ({
+                  label:
+                    (s.name?.split(" — ")[0] || s.name || "Sprint") +
+                    (s.state === "active" ? " (active)" : ""),
+                  value: s.id,
+                })),
+              ]}
+            />
+          )}
+          {bulkAssignMenu && (
+            <Menu
+              anchorRect={bulkAssignMenu}
+              onClose={() => setBulkAssignMenu(null)}
+              onSelect={(it) => {
+                onBulkAssign?.([...selected], it.value);
+                clearSelection();
+              }}
+              searchable
+              searchPlaceholder="Search people…"
+              width={240}
+              items={[
+                { label: "Unassigned", value: null },
+                { divider: true },
+                ...(Array.isArray(assignees) ? assignees : []).map((p) => ({
+                  label: p.name,
+                  value: p.id,
+                  avatar: p,
+                })),
+              ]}
+            />
+          )}
+          {bulkTypeMenu && (
+            <Menu
+              anchorRect={bulkTypeMenu}
+              onClose={() => setBulkTypeMenu(null)}
+              onSelect={(it) => {
+                onBulkSetType?.([...selected], it.value);
+                clearSelection();
+              }}
+              width={200}
+              items={types.map((t) => ({
+                label: t.name,
+                value: t.id,
+                icon: "epic",
+              }))}
+            />
+          )}
+          {bulkParentAnchor && onBulkSetParent && (
+            <ParentPicker
+              projectId={projectId}
+              value={null}
+              valueName={null}
+              initialAnchorRect={bulkParentAnchor}
+              onChange={(id, name) => {
+                if (id) {
+                  onBulkSetParent([...selected], id, name);
+                  clearSelection();
+                }
+                setBulkParentAnchor(null);
+              }}
+              triggerClassName="sr-only"
+            >
+              {() => null}
+            </ParentPicker>
+          )}
         </div>
       )}
     </section>

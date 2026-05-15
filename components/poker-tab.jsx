@@ -15,7 +15,13 @@ import { cn } from "@/lib/utils";
 // hero sizes scale with the panel width (~280px on xl, ~1000px on
 // small modals) rather than the viewport — what's "wide" here is
 // the sidebar, not the page.
-export function PokerTab({ task, allowed, canEdit, onUpdate, onApplied }) {
+export function PokerTab({ task, allowed: allowedRaw, canEdit, onUpdate, onApplied }) {
+  // OpenProject's allowedValues includes a "None" sentinel — strip it so
+  // players can't vote for a no-value option in a poker round.
+  const allowed = Array.isArray(allowedRaw)
+    ? allowedRaw.filter((o) => o.value != null && String(o.value).trim() !== "" && String(o.value).toLowerCase() !== "none")
+    : allowedRaw;
+
   const taskId = task?.id ? String(task.id) : null;
   const room = usePokerRoom({ taskId, enabled: true });
   const { state, connected, vote, reveal, reset, roomReset } = room;
@@ -423,22 +429,6 @@ function CardPicker({ allowed, myVote, onVote, busy }) {
             />
           );
         })}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onVote(null)}
-          title="Clear your vote"
-          aria-label="Clear vote"
-          className={cn(
-            "inline-flex items-center justify-center rounded-md border border-border-soft bg-transparent text-fg-subtle font-semibold tracking-wider cursor-pointer transition-colors",
-            "h-12 min-w-12 px-2 text-[15px]",
-            "@[420px]/poker:h-11 @[420px]/poker:min-w-11 @[420px]/poker:text-[14px]",
-            "hover:bg-surface-subtle hover:border-border",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
-          )}
-        >
-          —
-        </button>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ParentPicker } from "@/components/ui/parent-picker";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -127,6 +128,7 @@ export function CreateTask({
   defaultSprint = null,
   defaultStatus = null,
   projectName = "Project",
+  projectId = null,
   categories = [],
   types = [],
   priorities = [],
@@ -140,7 +142,6 @@ export function CreateTask({
   const [assignMenu, setAssignMenu] = useState(null);
   const [priorityMenu, setPriorityMenu] = useState(null);
   const [sprintMenu, setSprintMenu] = useState(null);
-  const [epicMenu, setEpicMenu] = useState(null);
   const [labelMenu, setLabelMenu] = useState(null);
 
   const {
@@ -173,6 +174,10 @@ export function CreateTask({
   const assignee = useWatch({ control, name: "assignee" });
   const priority = useWatch({ control, name: "priority" });
 
+  const points = useWatch({ control, name: "points" });
+  const pointsHref = useWatch({ control, name: "pointsHref" });
+  const sprint = useWatch({ control, name: "sprint" });
+
   // Once priorities load, hydrate the form's priority with the project's
   // configured default — `priority.isDefault` is the API truth.
   useEffect(() => {
@@ -181,10 +186,16 @@ export function CreateTask({
     const def = priorities.find((p) => p.isDefault) || priorities[0];
     if (def) setValue("priority", String(def.id));
   }, [priorities, priority, setValue]);
-  const points = useWatch({ control, name: "points" });
-  const pointsHref = useWatch({ control, name: "pointsHref" });
-  const sprint = useWatch({ control, name: "sprint" });
+
+  // Hydrate sprint once the active sprint resolves (sprintsQ may still be
+  // loading when the modal mounts). Only set if the user hasn't picked yet.
+  useEffect(() => {
+    if (!defaultSprint) return;
+    if (sprint) return;
+    setValue("sprint", defaultSprint);
+  }, [defaultSprint, sprint, setValue]);
   const epicId = useWatch({ control, name: "epic" });
+  const [parentName, setParentName] = useState(null);
 
   // Derive a story-points schema from any task whose type matches — its
   // schemaHref tells us whether SP is a CustomOption (t-shirt sizes) or
@@ -208,6 +219,18 @@ export function CreateTask({
     !!spField?.allowedValuesHref,
   );
   const spOptions = spOptionsQ.data || spField?.allowedValues || null;
+
+  // Default size to the middle option once the t-shirt list loads.
+  // Only fires when nothing is selected yet so a user's explicit clear is respected.
+  useEffect(() => {
+    if (!spIsCustomOption || !spOptions || spOptions.length === 0) return;
+    if (pointsHref) return;
+    const mid = spOptions[Math.floor((spOptions.length - 1) / 2)];
+    if (mid) {
+      setValue("pointsHref", mid.href || mid.id);
+      setValue("points", mid.value ?? mid.label ?? null);
+    }
+  }, [spIsCustomOption, spOptions, pointsHref, setValue]);
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose?.();
@@ -245,7 +268,6 @@ export function CreateTask({
     ? sprints.find((s) => s.id === sprint)?.name || null
     : null;
 
-  const selectedEpic = epicId ? findById(epics, epicId) : null;
 
   const labels = useWatch({ control, name: "labels" });
   const selectedTag = (labels || [])[0] || null;
@@ -551,54 +573,30 @@ export function CreateTask({
                 )}
               </div>
 
-              {/* Parent epic */}
+              {/* Parent */}
               <div className={ROW}>
                 <span className={ROW_LABEL}>
                   <Icon name="epic" size={13} aria-hidden="true" />
                   Parent
                 </span>
-                <button
-                  type="button"
-                  className={ROW_VALUE}
-                  onClick={(e) =>
-                    setEpicMenu(e.currentTarget.getBoundingClientRect())
-                  }
+                <ParentPicker
+                  triggerClassName={`${ROW_VALUE} ${!epicId ? ROW_PLACEHOLDER : ""}`}
+                  value={epicId || null}
+                  valueName={parentName}
+                  projectId={projectId}
+                  excludeId={null}
+                  onChange={(id, name) => {
+                    setValue("epic", id);
+                    setParentName(name);
+                  }}
                 >
-                  {selectedEpic ? (
+                  {({ displayName }) => (
                     <>
-                      <span
-                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                        style={{ background: selectedEpic.color || "var(--accent)" }}
-                      />
-                      <span className="truncate">{selectedEpic.title}</span>
+                      <span className="truncate">{displayName || <span className={ROW_PLACEHOLDER}>None</span>}</span>
+                      <Icon name="chev-down" size={11} className="ml-auto text-fg-subtle shrink-0" aria-hidden="true" />
                     </>
-                  ) : (
-                    <span className={ROW_PLACEHOLDER}>None</span>
                   )}
-                  <Icon
-                    name="chev-down"
-                    size={11}
-                    className="ml-auto text-fg-subtle shrink-0"
-                    aria-hidden="true"
-                  />
-                </button>
-                {epicMenu && (
-                  <Menu
-                    anchorRect={epicMenu}
-                    onClose={() => setEpicMenu(null)}
-                    onSelect={(it) => setValue("epic", it.value)}
-                    items={[
-                      { label: "None", value: null, active: !epicId },
-                      { divider: true },
-                      ...epics.map((e) => ({
-                        label: e.title || e.name,
-                        value: String(e.id),
-                        swatch: e.color || "var(--accent)",
-                        active: String(e.id) === String(epicId),
-                      })),
-                    ]}
-                  />
-                )}
+                </ParentPicker>
               </div>
 
               {/* Tag (single category) */}

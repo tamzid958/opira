@@ -559,7 +559,7 @@ export default function BacklogPage({ params: paramsPromise }) {
             placeholder="Search…"
             value={filters.q}
             onChange={(e) => setFilter("q", e.target.value)}
-            className="w-[140px] sm:w-[200px] h-7 pl-7 pr-2 rounded-md border border-border bg-surface-elevated text-xs text-fg outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-100)]"
+            className="w-35 sm:w-50 h-7 pl-7 pr-2 rounded-md border border-border bg-surface-elevated text-xs text-fg outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-100)]"
           />
         </div>
         {/* Active-only chips: render only when the filter is set, each
@@ -879,6 +879,7 @@ export default function BacklogPage({ params: paramsPromise }) {
             categories={categoriesQ.data || []}
             velocity={velocity}
             estimateUnit={estimateUnit}
+            estimateMode={estimateMode}
             manageVersions={manageVersions}
             currentUserId={me.data?.user?.id}
             pinnedSprintId={
@@ -1010,6 +1011,27 @@ export default function BacklogPage({ params: paramsPromise }) {
               if (!ids?.length) return;
               setBulkDeleteFor({ ids, clearSelection });
             }}
+            onBulkSetParent={async (ids, parentId, parentName) => {
+              const pending = toast.loading(
+                `Setting parent for ${ids.length} ${ids.length === 1 ? "issue" : "issues"}…`,
+              );
+              const { ok, gone, failed } = await runBatched(
+                ids,
+                updateTaskAsync,
+                () => ({ parent: parentId }),
+              );
+              toast.dismiss(pending);
+              if (failed > 0) {
+                toast.error(
+                  `Updated ${ok + gone} of ${ids.length}. ${failed} failed — see OpenProject.`,
+                );
+              } else {
+                toast.success(
+                  `${ok + gone} ${ok + gone === 1 ? "issue" : "issues"} → ${parentName || `#${parentId}`}`,
+                );
+              }
+            }}
+            projectId={projectId}
             onCreate={() => setParams({ create: "1" })}
           />
       </div>

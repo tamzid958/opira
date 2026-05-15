@@ -1,6 +1,7 @@
 import { opFetch } from "@/lib/openproject/client";
 import { makeCache } from "@/lib/openproject/route-cache";
 import { errorResponse } from "@/lib/openproject/route-utils";
+import { getCachedSchema, setCachedSchema } from "@/lib/data/redis-lookups-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,13 @@ function readAllowedValues(field) {
 export async function GET(_req, ctx) {
   try {
     const { schema } = await ctx.params;
+
+    const redisCached = await getCachedSchema(schema);
+    if (redisCached) {
+      CACHE.set(schema, redisCached);
+      return Response.json(redisCached);
+    }
+
     const cached = CACHE.get(schema);
     if (cached) return Response.json(cached);
 
@@ -104,7 +112,10 @@ export async function GET(_req, ctx) {
     const isComplete = Object.values(fields).every(
       (f) => f.type !== "CustomOption" || f.allowedValues || f.allowedValuesHref,
     );
-    if (isComplete) CACHE.set(schema, value);
+    if (isComplete) {
+      CACHE.set(schema, value);
+      await setCachedSchema(schema, value);
+    }
     return Response.json(value);
   } catch (e) {
     return errorResponse(e);

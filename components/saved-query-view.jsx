@@ -7,18 +7,20 @@ import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/icons";
 import { LoadingPill } from "@/components/ui/loading-pill";
 import { TaskStatusPill } from "@/components/ui/task-meta";
-import { formatEstimate } from "@/lib/openproject/estimate";
+import { formatEstimate, inferModeFromTasks } from "@/lib/openproject/estimate";
 import {
   useDeleteQuery,
   useSavedQuery,
   useToggleQueryStar,
 } from "@/lib/hooks/use-openproject";
+import { useEstimateMode } from "@/lib/hooks/use-estimate-mode";
 import { PEOPLE } from "@/lib/data";
 
 export function SavedQueryView({ queryId, projectId }) {
   const q = useSavedQuery(queryId, { execute: true }, !!queryId);
   const star = useToggleQueryStar();
   const del = useDeleteQuery();
+  const estimateModeQ = useEstimateMode(projectId);
 
   if (q.isLoading) {
     return (
@@ -34,6 +36,9 @@ export function SavedQueryView({ queryId, projectId }) {
   const data = q.data;
   if (!data) return null;
   const results = data.results || [];
+  const estimateMode = estimateModeQ.isLoading
+    ? inferModeFromTasks(results) || "numeric"
+    : estimateModeQ.mode || "numeric";
 
   const onStar = async () => {
     try {
@@ -129,7 +134,7 @@ export function SavedQueryView({ queryId, projectId }) {
                 </span>
                 <Avatar user={assignee} size="sm" />
                 <span className="text-right font-mono text-xs tabular-nums text-fg-muted">
-                  {formatEstimate(wp) ?? "—"}
+                  {formatEstimate(wp, { mode: estimateMode }) ?? "—"}
                 </span>
               </Link>
             );

@@ -48,6 +48,7 @@ function Row({
   statuses,
   recentlyUpdated = false,
   fadedByOverlay = false,
+  estimateMode = "numeric",
 }) {
   const [statusMenu, setStatusMenu] = useState(null);
   const editable = task.permissions?.update !== false;
@@ -157,7 +158,7 @@ function Row({
         title={`${task.points || 0} story points`}
         className="hidden md:inline-flex justify-center shrink-0 px-2 py-0.5 rounded-full bg-surface-muted text-[11px] font-medium text-fg-muted text-center min-w-9"
       >
-        {formatEstimate(task) ?? "—"}
+        {formatEstimate(task, { mode: estimateMode }) ?? "—"}
       </span>
 
       <Avatar user={task.assignee ? { id: task.assignee, name: task.assigneeName } : null} size="sm" />
@@ -218,6 +219,7 @@ export function BoardList({
   onMoveTask,
   onUpdate,
   updatedSince = null,
+  estimateMode = "numeric",
 }) {
   const sinceMs = updatedSince ? new Date(updatedSince).getTime() : null;
   const isRecent = (task) =>
@@ -231,20 +233,39 @@ export function BoardList({
   const childIndex = buildChildIndex(tasks);
   const roots = rootsOf(tasks);
 
-  // Two buckets: "real" parents (root tasks that themselves have at
-  // least one direct child in this slice) and the rest (leaf-roots
-  // and orphans-by-filter), which collect into a single trailing
-  // "Without parent" section so the eye doesn't have to chase
-  // single-row sections at the top.
-  const { parents, loose } = (() => {
+  // Three buckets:
+  // - parents: root tasks that have at least one direct child in this slice
+  // - filteredChildren: tasks that have a real parent (t.epic != null) but
+  //   whose parent was filtered out of the current slice — these must NOT
+  //   be labelled "Without parent"
+  // - trueOrphans: tasks with no parent at all (t.epic == null)
+  const { parents, filteredChildren, trueOrphans } = (() => {
     const p = [];
-    const l = [];
+    const fc = [];
+    const to = [];
     for (const t of roots) {
       const kids = childIndex.get(String(t.nativeId)) || [];
-      if (kids.length > 0) p.push(t);
-      else l.push(t);
+      if (kids.length > 0) {
+        p.push(t);
+      } else if (t.epic != null) {
+        fc.push(t);
+      } else {
+        to.push(t);
+      }
     }
-    return { parents: p, loose: l };
+    return { parents: p, filteredChildren: fc, trueOrphans: to };
+  })();
+
+  // Group filteredChildren by their parent id so each gets its own section
+  // headed by the parent's name (the parent was filtered out but still exists).
+  const filteredChildGroups = (() => {
+    const map = new Map();
+    for (const t of filteredChildren) {
+      const key = String(t.epic);
+      if (!map.has(key)) map.set(key, { epicId: key, epicName: t.epicName || key, tasks: [] });
+      map.get(key).tasks.push(t);
+    }
+    return [...map.values()];
   })();
 
   const [collapsed, setCollapsed] = useState(() => new Set());
@@ -324,6 +345,7 @@ export function BoardList({
           statuses={statuses}
           recentlyUpdated={isRecent(task)}
           fadedByOverlay={sinceMs != null}
+          estimateMode={estimateMode}
         />
         {hasKids && isExpanded &&
           kids.map((c) => renderSubtree(c, depth + 1))}
@@ -364,14 +386,26 @@ export function BoardList({
           </Group>
         ))}
 
-        {loose.length > 0 && (
+        {filteredChildGroups.map((g) => (
+          <Group
+            key={`epic:${g.epicId}`}
+            parentId={null}
+            label={g.epicName}
+            headerEyebrow={parents.length > 0}
+            isOver={false}
+          >
+            {g.tasks.map((t) => renderSubtree(t, 0))}
+          </Group>
+        ))}
+
+        {trueOrphans.length > 0 && (
           <Group
             parentId={null}
-            label={parents.length > 0 ? "Without parent" : null}
-            headerEyebrow={parents.length > 0}
+            label={parents.length > 0 || filteredChildGroups.length > 0 ? "Without parent" : null}
+            headerEyebrow={parents.length > 0 || filteredChildGroups.length > 0}
             isOver={overId === "parent:none"}
           >
-            {loose.map((t) => renderSubtree(t, 0))}
+            {trueOrphans.map((t) => renderSubtree(t, 0))}
           </Group>
         )}
       </div>

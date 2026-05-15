@@ -18,7 +18,8 @@ import { pickSprintByDate } from "@/lib/hooks/use-active-sprint";
 export default function OverviewPage({ params: paramsPromise }) {
   const { projectId } = use(paramsPromise);
   const router = useRouter();
-  const { setParams } = useUrlParams();
+  const { setParams, params } = useUrlParams();
+  const activeTab = params.get("tab") === "overview" ? "overview" : "my-work";
 
   const status = useApiStatus();
   const configured = status.data?.configured === true;
@@ -56,6 +57,8 @@ export default function OverviewPage({ params: paramsPromise }) {
           activeSprint={activeSprint}
           sprints={sprintsQ.data || []}
           tasks={tasksQ.data || []}
+          activeTab={activeTab}
+          onTabChange={(tab) => setParams({ tab })}
           onTaskClick={(id) => setParams({ wp: id })}
           onChangeView={(view) => router.push(`/projects/${projectId}/${view}`)}
         />

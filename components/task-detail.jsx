@@ -28,6 +28,7 @@ import { RevisionsPanel } from "@/components/revisions-panel";
 import { WatcherButton } from "@/components/watcher-button";
 import { TimeEntriesPanel } from "@/components/time-entries-panel";
 import { RemindersPanel } from "@/components/reminders-panel";
+import { ParentPicker } from "@/components/ui/parent-picker";
 import { TShirtPicker } from "@/components/tshirt-picker";
 import { EstimatePicker } from "@/components/estimate-picker";
 import { PokerTab } from "@/components/poker-tab";
@@ -235,6 +236,11 @@ export function TaskDetail({
   onUpdate,
   onChange,
   onSelectTask,
+  onSubtaskBulkMoveSprint,
+  onSubtaskBulkAssign,
+  onSubtaskBulkSetType,
+  onSubtaskBulkSetParent,
+  onSubtaskBulkDelete,
 }) {
   const task = tasks.find((t) => t.id === taskId);
   const wpId = task?.nativeId;
@@ -641,11 +647,18 @@ export function TaskDetail({
               statuses={statuses}
               assignees={assignees}
               sprints={sprints}
+              types={types}
               canCreate={canEdit}
+              currentUserId={currentUser?.id}
               allTasks={tasks}
               onUpdate={onUpdate}
               onChange={onChange}
               onTaskClick={onSelectTask}
+              onBulkMoveSprint={onSubtaskBulkMoveSprint}
+              onBulkAssign={onSubtaskBulkAssign}
+              onBulkSetType={onSubtaskBulkSetType}
+              onBulkSetParent={onSubtaskBulkSetParent}
+              onBulkDelete={onSubtaskBulkDelete}
             />
           </section>
 
@@ -1084,39 +1097,21 @@ export function TaskDetail({
                 }}
               />
 
-              <span className={FIELD_LABEL}>Epic</span>
-              <InlineSelect
-                value={task.epic}
+              <span className={FIELD_LABEL}>Parent</span>
+              <ParentPicker
+                triggerClassName={[
+                  FIELD_BTN,
+                  !task.epic ? "text-fg-faint" : "",
+                  !canEdit ? "opacity-60 cursor-default hover:bg-transparent hover:border-transparent" : "",
+                ].filter(Boolean).join(" ")}
+                value={task.epic ? String(task.epic) : null}
+                valueName={task.epicName || null}
+                projectId={projectId}
+                excludeId={task.nativeId}
                 disabled={!canEdit}
-                items={[
-                  { label: "None", value: null, active: !task.epic },
-                  { divider: true },
-                  ...(epics || []).map((e) => ({
-                    label: e.title || e.name,
-                    value: String(e.nativeId ?? e.id),
-                    swatch: e.color || "var(--accent)",
-                    active: String(task.epic) === String(e.nativeId ?? e.id),
-                  })),
-                ]}
-                onChange={(v) => {
+                onChange={(v, name) => {
                   onUpdate(task.id, { parent: v });
-                  onChange?.("Epic updated");
-                }}
-                render={(v) => {
-                  if (!v) return <span>None</span>;
-                  const found = (epics || []).find(
-                    (e) => String(e.nativeId ?? e.id) === String(v),
-                  );
-                  const name = found?.title || found?.name || task.epicName || "Epic";
-                  return (
-                    <>
-                      <span
-                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                        style={{ background: found?.color || "var(--accent)" }}
-                      />
-                      <span className="truncate">{name}</span>
-                    </>
-                  );
+                  onChange?.(`Parent → ${name || "None"}`);
                 }}
               />
 

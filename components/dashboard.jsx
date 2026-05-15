@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   addDays,
   differenceInCalendarDays,
@@ -15,11 +15,11 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { useBurndown } from "@/lib/hooks/use-openproject-detail";
 import { useEstimateMode } from "@/lib/hooks/use-estimate-mode";
 import { unitFor, weightOf } from "@/lib/openproject/estimate";
+import { ratioOf } from "@/lib/openproject/task-state";
 import { cn, safeParseISO as safeISO } from "@/lib/utils";
 
 // ─────────────────────────────────────────────────────────────────
 // Helpers
-
 
 function greetingFor(date = new Date()) {
   const h = date.getHours();
@@ -41,7 +41,7 @@ function dueLabel(due, now) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Sub-components — minimal, chrome-less, hairline-driven
+// Shared sub-components
 
 function PulseCell({ label, value, hint, tone = "default", index = 0 }) {
   const valueColor =
@@ -54,7 +54,7 @@ function PulseCell({ label, value, hint, tone = "default", index = 0 }) {
       className="flex flex-col gap-2 px-4 py-4 sm:px-5 sm:py-5 border-r border-border-soft last:border-r-0"
     >
       <Eyebrow>{label}</Eyebrow>
-      <div className={cn("font-display text-[28px] sm:text-[32px] font-semibold leading-none tracking-[-0.025em] tabular-nums", valueColor)}>
+      <div className={cn("font-display text-[28px] sm:text-[32px] font-semibold leading-none tracking-tight tabular-nums", valueColor)}>
         {value}
       </div>
       {hint && <div className="text-[12px] text-fg-subtle leading-tight">{hint}</div>}
@@ -78,7 +78,7 @@ function TodayItem({ task, onClick, now }) {
       <TaskStatusPill task={task} />
       <span
         className={cn(
-          "hidden sm:inline text-[11.5px] tabular-nums shrink-0 min-w-[88px] text-right",
+          "hidden sm:inline text-[11.5px] tabular-nums shrink-0 min-w-22 text-right",
           overdue ? "text-pri-highest font-medium" : "text-fg-subtle",
         )}
       >
@@ -88,9 +88,6 @@ function TodayItem({ task, onClick, now }) {
   );
 }
 
-// Compact prev/next pager used by the Cadence and Top-assignees rails.
-// Renders nothing when the list fits in a single page so empty/short
-// projects don't show dead controls.
 function SectionPager({ page, pageCount, label, onPrev, onNext }) {
   if (pageCount <= 1) return null;
   return (
@@ -141,7 +138,7 @@ function CadenceCard({ sp, isActive, onOpen }) {
       type="button"
       onClick={onOpen}
       className={cn(
-        "luxe-card snap-start shrink-0 w-[260px] sm:w-[300px] text-left p-5 transition-colors",
+        "luxe-card snap-start shrink-0 w-65 sm:w-75 text-left p-5 transition-colors",
         isActive && "border-border",
       )}
     >
@@ -178,11 +175,6 @@ function CadenceCard({ sp, isActive, onOpen }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Sprint health — trend pill + scope-change pip + % done. Reads the
-// burndown for the active sprint; degrades silently when the sprint
-// has no committed scope or no dates.
-
 function SprintHealthTile({ projectId, activeSprint }) {
   const enabled = !!projectId && !!activeSprint?.id;
   const q = useBurndown(projectId, activeSprint?.id, enabled);
@@ -190,9 +182,6 @@ function SprintHealthTile({ projectId, activeSprint }) {
 
   const data = q.data || {};
   const unit = data.unit || "pts";
-  // Denominator is current scope (baseline ± mid-sprint adds/removes), so the
-  // percent stays in [0, 100] when scope grew. Trend pill below still compares
-  // against baseline — that's the standard burndown ideal line.
   const baseline = data.committedAtStart || 0;
   const totalScope = data.totalCommitted || baseline;
   const lastRemaining = data.points?.[data.points.length - 1]?.remaining ?? totalScope;
@@ -278,40 +267,24 @@ function SprintHealthTile({ projectId, activeSprint }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Main
+// Overall tab — project-wide health
 
-export function Dashboard({
+function OverallTab({
   project,
-  currentUser,
   activeSprint,
-  sprints = [],
-  tasks = [],
-  onTaskClick,
+  sprints,
+  tasks,
+  mode,
+  unit,
   onChangeView,
+  onTaskClick,
 }) {
-  const myId = currentUser?.id;
-  const firstName = currentUser?.name?.split(" ")[0] || "there";
-  const today = new Date();
-  // Schema-anchored estimation mode. Drives weightOf on every assignee
-  // tally + my-open-work sum, plus the unit suffix on the chrome so a
-  // t-shirt project doesn't read "27 d" or sum stray date weights into
-  // its points totals.
-  const estimateModeQ = useEstimateMode(project?.id);
-  const mode = estimateModeQ.mode || "numeric";
-  const unit = unitFor(mode);
-  // Pagination state for the two long rails on this page. Both default
-  // to page 0 (latest / leaders) and walk in fixed-size windows so the
-  // page lands quietly even on projects with deep sprint history or
-  // large teams.
   const [cadencePage, setCadencePage] = useState(0);
   const [topPage, setTopPage] = useState(0);
+  const today = new Date();
 
-  // Slices — three numbers + one focus list + a top-assignees roll-up.
   const openTasks = tasks.filter((t) => !t.statusIsClosed);
-  const myOpen = myId ? openTasks.filter((t) => t.assignee === myId) : [];
 
-  // Every assignee with open work, sorted by leaders first. Paginated in
-  // the render below so the rail stays compact regardless of team size.
   const topAssignees = (() => {
     const tally = new Map();
     for (const t of openTasks) {
@@ -328,30 +301,20 @@ export function Dashboard({
     }
     return [...tally.values()].sort((a, b) => b.count - a.count);
   })();
-  // Drive the bar by story points when at least one assignee has any
-  // estimate; otherwise fall back to open-issue count so the section
-  // still says something visually on a project that hasn't sized work
-  // yet. The leader's value (max across the visible top-5) is the
-  // baseline — every other bar is a fraction of it.
+
   const topMaxPoints = topAssignees.reduce((m, a) => Math.max(m, a.points || 0), 0);
   const topMaxCount = topAssignees[0]?.count || 0;
   const useTopPoints = topMaxPoints > 0;
-  const topPageCount = Math.max(
-    1,
-    Math.ceil(topAssignees.length / TOP_PAGE_SIZE),
-  );
+  const topPageCount = Math.max(1, Math.ceil(topAssignees.length / TOP_PAGE_SIZE));
   const safeTopPage = Math.min(topPage, topPageCount - 1);
   const visibleTopAssignees = topAssignees.slice(
     safeTopPage * TOP_PAGE_SIZE,
     safeTopPage * TOP_PAGE_SIZE + TOP_PAGE_SIZE,
   );
   const topRangeStart = safeTopPage * TOP_PAGE_SIZE + 1;
-  const topRangeEnd = Math.min(
-    safeTopPage * TOP_PAGE_SIZE + TOP_PAGE_SIZE,
-    topAssignees.length,
-  );
+  const topRangeEnd = Math.min(safeTopPage * TOP_PAGE_SIZE + TOP_PAGE_SIZE, topAssignees.length);
 
-  const { dueToday, overdue, focus } = (() => {
+  const { overdue, focus } = (() => {
     const dt = [];
     const od = [];
     for (const t of tasks) {
@@ -360,11 +323,7 @@ export function Dashboard({
       if (!due) continue;
       if (due < today && !isToday(due)) {
         od.push({ t, due });
-      } else if (isToday(due)) {
-        dt.push({ t, due });
-      } else if (isWithinInterval(due, { start: today, end: addDays(today, 3) })) {
-        // Pull "next 3 days" into the focus tail so the section is never
-        // empty just because today happens to be quiet.
+      } else if (isToday(due) || isWithinInterval(due, { start: today, end: addDays(today, 3) })) {
         dt.push({ t, due });
       }
     }
@@ -374,10 +333,525 @@ export function Dashboard({
       ...od.map((x) => ({ ...x, group: "overdue" })),
       ...dt.map((x) => ({ ...x, group: "today" })),
     ].slice(0, 8);
-    return { dueToday: dt, overdue: od, focus: fcs };
+    return { overdue: od, dueToday: dt, focus: fcs };
   })();
 
-  // Sprint context for the hero eyebrow.
+  const cadence = (() => {
+    const rank = (s) =>
+      s.state === "active" ? 0 : s.state === "planned" ? 1 : 2;
+    const bySprintId = new Map();
+    for (const t of tasks) {
+      if (!t.sprint) continue;
+      const ent = bySprintId.get(t.sprint) || { count: 0, doneRatio: 0 };
+      ent.count += 1;
+      ent.doneRatio += ratioOf(t);
+      bySprintId.set(t.sprint, ent);
+    }
+    return [...sprints]
+      .map((sp) => {
+        const ent = bySprintId.get(sp.id);
+        return { ...sp, taskCount: ent?.count ?? 0, doneCount: Math.round(ent?.doneRatio ?? 0) };
+      })
+      .sort((a, b) => {
+        if (rank(a) !== rank(b)) return rank(a) - rank(b);
+        return (a.start || "").localeCompare(b.start || "");
+      });
+  })();
+
+  const cadencePageCount = Math.max(1, Math.ceil(cadence.length / CADENCE_PAGE_SIZE));
+  const safeCadencePage = Math.min(cadencePage, cadencePageCount - 1);
+  const visibleCadence = cadence.slice(
+    safeCadencePage * CADENCE_PAGE_SIZE,
+    safeCadencePage * CADENCE_PAGE_SIZE + CADENCE_PAGE_SIZE,
+  );
+  const cadenceRangeStart = safeCadencePage * CADENCE_PAGE_SIZE + 1;
+  const cadenceRangeEnd = Math.min(
+    safeCadencePage * CADENCE_PAGE_SIZE + CADENCE_PAGE_SIZE,
+    cadence.length,
+  );
+
+  return (
+    <div className="max-w-295 mx-auto pb-10 grid gap-5 sm:gap-6">
+      {/* Pulse */}
+      <section>
+        <Eyebrow className="mb-2 px-1">Pulse</Eyebrow>
+        <div data-stagger className="luxe-card grid grid-cols-3 overflow-hidden">
+          <PulseCell
+            index={0}
+            label="Open"
+            value={openTasks.length}
+            hint={
+              openTasks.length === 0
+                ? "All clear."
+                : `${tasks.length - openTasks.length} of ${tasks.length} closed`
+            }
+          />
+          <PulseCell
+            index={1}
+            label="Overdue"
+            value={overdue.length}
+            hint={
+              overdue.length === 0
+                ? "Nothing past due."
+                : `Oldest ${dueLabel(overdue[0]?.due, today).toLowerCase()}`
+            }
+            tone={overdue.length > 0 ? "danger" : "default"}
+          />
+          <PulseCell
+            index={2}
+            label="Sprints"
+            value={sprints.length}
+            hint={
+              sprints.filter((s) => s.state === "active").length > 0
+                ? "1 active"
+                : sprints.filter((s) => s.state === "planned").length > 0
+                ? `${sprints.filter((s) => s.state === "planned").length} planned`
+                : "No active sprint"
+            }
+          />
+        </div>
+      </section>
+
+      {activeSprint && (
+        <section>
+          <SprintHealthTile projectId={project?.id} activeSprint={activeSprint} />
+        </section>
+      )}
+
+      {/* Top Assignees */}
+      {topAssignees.length > 0 && (
+        <section>
+          <div className="flex items-baseline justify-between mb-2 px-1">
+            <Eyebrow>
+              {useTopPoints
+                ? unit === "d"
+                  ? "Working days by member"
+                  : "Story points by member"
+                : "Top assignees"}
+            </Eyebrow>
+            <button
+              type="button"
+              onClick={() => onChangeView?.("members")}
+              className="text-[11.5px] text-fg-subtle hover:text-fg transition-colors"
+            >
+              See team →
+            </button>
+          </div>
+          <ul className="luxe-card overflow-hidden m-0 p-0 list-none">
+            {visibleTopAssignees.map((a) => {
+              const pct = useTopPoints
+                ? topMaxPoints > 0
+                  ? Math.max(2, ((a.points || 0) / topMaxPoints) * 100)
+                  : 0
+                : topMaxCount > 0
+                ? Math.max(2, (a.count / topMaxCount) * 100)
+                : 0;
+              return (
+                <li
+                  key={a.id}
+                  className="flex items-center gap-3 px-4 py-3 border-b border-border-soft last:border-b-0"
+                >
+                  <Avatar user={a} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13.5px] text-fg truncate leading-tight">
+                      {a.name}
+                    </div>
+                    <div className="mt-2 h-1.5 rounded-full bg-surface-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-accent transition-[width] duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 min-w-16">
+                    <div className="font-display text-[16px] font-semibold tabular-nums text-fg leading-none">
+                      {useTopPoints ? a.points || 0 : a.count}
+                    </div>
+                    <div className="text-[10.5px] text-fg-faint mt-1 uppercase tracking-[0.12em]">
+                      {useTopPoints ? `${unit} · ${a.count} open` : "open"}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <SectionPager
+            page={safeTopPage}
+            pageCount={topPageCount}
+            label={`Showing ${topRangeStart}–${topRangeEnd} of ${topAssignees.length}`}
+            onPrev={() => setTopPage((p) => Math.max(0, p - 1))}
+            onNext={() => setTopPage((p) => Math.min(topPageCount - 1, p + 1))}
+          />
+        </section>
+      )}
+
+      {/* Cadence */}
+      {cadence.length > 0 && (
+        <section>
+          <div className="flex items-baseline justify-between mb-2 px-1">
+            <Eyebrow>Cadence</Eyebrow>
+            <button
+              type="button"
+              onClick={() => onChangeView?.("backlog")}
+              className="text-[11.5px] text-fg-subtle hover:text-fg transition-colors"
+            >
+              See all sprints →
+            </button>
+          </div>
+          <div className="board-scroller -mx-3 sm:-mx-6 px-3 sm:px-6 pb-2 flex gap-4 overflow-x-auto">
+            {visibleCadence.map((sp) => (
+              <CadenceCard
+                key={sp.id}
+                sp={sp}
+                isActive={activeSprint?.id === sp.id}
+                onOpen={() => onChangeView?.("backlog")}
+              />
+            ))}
+          </div>
+          <SectionPager
+            page={safeCadencePage}
+            pageCount={cadencePageCount}
+            label={`Showing ${cadenceRangeStart}–${cadenceRangeEnd} of ${cadence.length} sprints`}
+            onPrev={() => setCadencePage((p) => Math.max(0, p - 1))}
+            onNext={() => setCadencePage((p) => Math.min(cadencePageCount - 1, p + 1))}
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// My Work tab — tasks assigned to the logged-in user
+
+function MyWorkTab({ currentUser, tasks, sprints, activeSprint, mode, unit, onTaskClick, onChangeView }) {
+  const myId = currentUser?.id;
+  const today = new Date();
+  const [pastSprintsExpanded, setPastSprintsExpanded] = useState({});
+
+  const myTasks = myId ? tasks.filter((t) => t.assignee === myId) : [];
+  const myOpen = myTasks.filter((t) => !t.statusIsClosed);
+  const myClosed = myTasks.filter((t) => t.statusIsClosed);
+  const myPoints = myOpen.reduce((s, t) => s + weightOf(t, { mode }), 0);
+
+  // Current sprint tasks for this user
+  const currentSprintTasks = activeSprint
+    ? myTasks.filter((t) => t.sprint === activeSprint.id)
+    : [];
+  const currentSprintOpen = currentSprintTasks.filter((t) => !t.statusIsClosed);
+  const currentSprintClosed = currentSprintTasks.filter((t) => t.statusIsClosed);
+
+  // Past sprint groups — closed sprints that have at least one task for this user
+  const pastSprintGroups = (() => {
+    const closed = sprints.filter(
+      (s) => s.state === "closed" && s.id !== activeSprint?.id,
+    );
+    return closed
+      .map((sp) => ({
+        sprint: sp,
+        tasks: myTasks.filter((t) => t.sprint === sp.id),
+      }))
+      .filter((g) => g.tasks.length > 0)
+      .sort((a, b) => (b.sprint.end || "").localeCompare(a.sprint.end || ""));
+  })();
+
+  const { myOverdue, myDueSoon, myFocus } = (() => {
+    const od = [];
+    const ds = [];
+    for (const t of myOpen) {
+      const due = safeISO(t.dueDate);
+      if (!due) continue;
+      if (due < today && !isToday(due)) {
+        od.push({ t, due });
+      } else if (isToday(due) || isWithinInterval(due, { start: today, end: addDays(today, 3) })) {
+        ds.push({ t, due });
+      }
+    }
+    od.sort((a, b) => a.due - b.due);
+    ds.sort((a, b) => a.due - b.due);
+    const fcs = [
+      ...od.map((x) => ({ ...x, group: "overdue" })),
+      ...ds.map((x) => ({ ...x, group: "today" })),
+    ].slice(0, 12);
+    return { myOverdue: od, myDueSoon: ds, myFocus: fcs };
+  })();
+
+  // Tasks not in any sprint and not already shown in focus list
+  const focusIds = new Set(myFocus.map((x) => x.t.id));
+  const currentSprintIds = new Set(currentSprintTasks.map((t) => t.id));
+  const myBacklog = myOpen
+    .filter((t) => !focusIds.has(t.id) && !currentSprintIds.has(t.id))
+    .sort((a, b) => (a.priorityPosition ?? 99) - (b.priorityPosition ?? 99))
+    .slice(0, 20);
+
+  if (!myId) {
+    return (
+      <div className="max-w-295 mx-auto pb-10">
+        <div className="luxe-card px-5 py-10 text-center">
+          <p className="text-[13px] text-fg-subtle">Could not load your profile.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-295 mx-auto pb-10 grid gap-5 sm:gap-6">
+      {/* Personal pulse */}
+      <section>
+        <Eyebrow className="mb-2 px-1">Your work</Eyebrow>
+        <div data-stagger className="luxe-card grid grid-cols-3 overflow-hidden">
+          <PulseCell
+            index={0}
+            label="Open"
+            value={myOpen.length}
+            hint={
+              myOpen.length === 0
+                ? "Inbox zero."
+                : `${myPoints} ${unit === "d" ? "working days" : "story points"}`
+            }
+            tone={myOpen.length > 5 ? "warning" : "default"}
+          />
+          <PulseCell
+            index={1}
+            label="Overdue"
+            value={myOverdue.length}
+            hint={
+              myOverdue.length === 0
+                ? "Nothing past due."
+                : `Oldest ${dueLabel(myOverdue[0]?.due, today).toLowerCase()}`
+            }
+            tone={myOverdue.length > 0 ? "danger" : "default"}
+          />
+          <PulseCell
+            index={2}
+            label="Closed"
+            value={myClosed.length}
+            hint={
+              myTasks.length > 0
+                ? `${Math.round((myClosed.length / myTasks.length) * 100)}% of your tasks`
+                : "No tasks yet"
+            }
+          />
+        </div>
+      </section>
+
+      {/* Due soon / overdue */}
+      {myFocus.length > 0 && (
+        <section>
+          <div className="flex items-baseline justify-between mb-2 px-1">
+            <Eyebrow>Due soon &amp; overdue</Eyebrow>
+            <span className="text-[11.5px] text-fg-subtle">
+              {myFocus.length} {myFocus.length === 1 ? "item" : "items"}
+            </span>
+          </div>
+          <ul className="luxe-card overflow-hidden m-0 p-0 list-none">
+            {myFocus.map(({ t }, i) => {
+              const showHeader = i === 0 || myFocus[i - 1].group !== myFocus[i].group;
+              return (
+                <Fragment key={t.id}>
+                  {showHeader && (
+                    <li className="px-4 pt-3 pb-1 bg-surface-subtle/50 border-b border-border-soft list-none" role="presentation">
+                      <Eyebrow>
+                        {myFocus[i].group === "overdue"
+                          ? `Overdue (${myOverdue.length})`
+                          : `Due soon (${myDueSoon.length})`}
+                      </Eyebrow>
+                    </li>
+                  )}
+                  <TodayItem task={t} onClick={onTaskClick} now={today} />
+                </Fragment>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/* Current sprint */}
+      {activeSprint && currentSprintTasks.length > 0 && (
+        <section>
+          <div className="flex items-baseline justify-between mb-2 px-1">
+            <Eyebrow>
+              Current sprint · {activeSprint.name?.split(" — ")[0] || activeSprint.name}
+            </Eyebrow>
+            <span className="text-[11.5px] text-fg-subtle">
+              {currentSprintOpen.length} open · {currentSprintClosed.length} done
+            </span>
+          </div>
+          <ul className="luxe-card overflow-hidden m-0 p-0 list-none">
+            {currentSprintTasks.map((t) => (
+              <TodayItem key={t.id} task={t} onClick={onTaskClick} now={today} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Remaining open work outside current sprint */}
+      {myBacklog.length > 0 && (
+        <section>
+          <div className="flex items-baseline justify-between mb-2 px-1">
+            <Eyebrow>Other open work</Eyebrow>
+            <span className="text-[11.5px] text-fg-subtle">
+              {myOpen.length - currentSprintOpen.length} tasks
+            </span>
+          </div>
+          <ul className="luxe-card overflow-hidden m-0 p-0 list-none">
+            {myBacklog.map((t) => (
+              <TodayItem key={t.id} task={t} onClick={onTaskClick} now={today} />
+            ))}
+          </ul>
+          {myOpen.length - currentSprintOpen.length > 20 && (
+            <p className="mt-2 px-1 text-[11.5px] text-fg-subtle">
+              Showing 20 —{" "}
+              <button
+                type="button"
+                onClick={() => onChangeView?.("backlog")}
+                className="underline hover:text-fg transition-colors"
+              >
+                open backlog
+              </button>{" "}
+              to see all.
+            </p>
+          )}
+        </section>
+      )}
+
+      {myOpen.length === 0 && (
+        <div className="luxe-card px-5 py-10 text-center">
+          <h3 className="font-display text-[16px] font-semibold tracking-[-0.018em] text-fg m-0">
+            All clear
+          </h3>
+          <p className="mt-2 text-[13px] text-fg-subtle">
+            No open tasks assigned to you right now.
+          </p>
+        </div>
+      )}
+
+      {/* Past sprints */}
+      {pastSprintGroups.length > 0 && (
+        <section>
+          <Eyebrow className="mb-2 px-1">Past sprints</Eyebrow>
+          <div className="grid gap-3">
+            {pastSprintGroups.map(({ sprint, tasks: spTasks }) => {
+              const open = spTasks.filter((t) => !t.statusIsClosed).length;
+              const done = spTasks.filter((t) => t.statusIsClosed).length;
+              const isExpanded = !!pastSprintsExpanded[sprint.id];
+              return (
+                <div key={sprint.id} className="luxe-card overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPastSprintsExpanded((prev) => ({
+                        ...prev,
+                        [sprint.id]: !prev[sprint.id],
+                      }))
+                    }
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-subtle/60 transition-colors"
+                  >
+                    <Icon
+                      name={isExpanded ? "chev-down" : "chev-right"}
+                      size={13}
+                      className="text-fg-subtle shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span className="flex-1 min-w-0 text-[13.5px] font-medium text-fg truncate">
+                      {sprint.name?.split(" — ")[0] || sprint.name}
+                    </span>
+                    <span className="text-[11.5px] text-fg-subtle shrink-0">
+                      {done} done
+                      {open > 0 && (
+                        <span className="ml-1.5 text-pri-medium font-medium">
+                          · {open} open
+                        </span>
+                      )}
+                    </span>
+                    {sprint.end && (
+                      <span className="hidden sm:inline text-[11px] text-fg-faint shrink-0 ml-2">
+                        {sprint.end}
+                      </span>
+                    )}
+                  </button>
+                  {isExpanded && (
+                    <ul className="m-0 p-0 list-none border-t border-border-soft">
+                      {spTasks.map((t) => (
+                        <TodayItem key={t.id} task={t} onClick={onTaskClick} now={today} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Tab bar
+
+const TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "my-work", label: "My Work" },
+];
+
+function TabBar({ active, onChange }) {
+  return (
+    <div className="flex items-center gap-0.5 mt-3 -mb-px">
+      {TABS.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onChange(tab.id)}
+          className={cn(
+            "h-8 px-3.5 text-[13px] font-medium rounded-t-md border-b-2 transition-colors",
+            active === tab.id
+              ? "border-accent text-fg bg-transparent"
+              : "border-transparent text-fg-subtle hover:text-fg hover:bg-surface-subtle/60",
+          )}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Main
+
+export function Dashboard({
+  project,
+  currentUser,
+  activeSprint,
+  sprints = [],
+  tasks = [],
+  activeTab = "my-work",
+  onTabChange,
+  onTaskClick,
+  onChangeView,
+}) {
+  const myId = currentUser?.id;
+  const firstName = currentUser?.name?.split(" ")[0] || "there";
+  const today = new Date();
+
+  const estimateModeQ = useEstimateMode(project?.id);
+  const mode = estimateModeQ.mode || "numeric";
+  const unit = unitFor(mode);
+
+  const openTasks = tasks.filter((t) => !t.statusIsClosed);
+  const myOpen = myId ? openTasks.filter((t) => t.assignee === myId) : [];
+
+  const overdue = (() => {
+    const od = [];
+    for (const t of tasks) {
+      if (t.statusIsClosed) continue;
+      const due = safeISO(t.dueDate);
+      if (due && due < today && !isToday(due)) od.push({ t, due });
+    }
+    return od;
+  })();
+
   const sprintInfo = (() => {
     if (!activeSprint) return null;
     const start = safeISO(activeSprint.start);
@@ -392,45 +866,8 @@ export function Dashboard({
       try { return formatDistanceToNowStrict(end, { addSuffix: true }); }
       catch { return null; }
     })();
-    return {
-      name: activeSprint.name?.split(" — ")[0],
-      dayIn,
-      totalDays,
-      endsIn,
-    };
+    return { name: activeSprint.name?.split(" — ")[0], dayIn, totalDays, endsIn };
   })();
-
-  // Sprint roadmap — annotate each sprint with its task counts so the
-  // Cadence rail can render a one-line progress bar without re-running
-  // the slicing logic for every card. Paginated in the render below.
-  const cadence = (() => {
-    const rank = (s) =>
-      s.state === "active" ? 0 : s.state === "planned" ? 1 : 2;
-    return [...sprints]
-      .map((sp) => {
-        const inSprint = tasks.filter((t) => t.sprint === sp.id);
-        const done = inSprint.filter((t) => t.statusIsClosed).length;
-        return { ...sp, taskCount: inSprint.length, doneCount: done };
-      })
-      .sort((a, b) => {
-        if (rank(a) !== rank(b)) return rank(a) - rank(b);
-        return (a.start || "").localeCompare(b.start || "");
-      });
-  })();
-  const cadencePageCount = Math.max(
-    1,
-    Math.ceil(cadence.length / CADENCE_PAGE_SIZE),
-  );
-  const safeCadencePage = Math.min(cadencePage, cadencePageCount - 1);
-  const visibleCadence = cadence.slice(
-    safeCadencePage * CADENCE_PAGE_SIZE,
-    safeCadencePage * CADENCE_PAGE_SIZE + CADENCE_PAGE_SIZE,
-  );
-  const cadenceRangeStart = safeCadencePage * CADENCE_PAGE_SIZE + 1;
-  const cadenceRangeEnd = Math.min(
-    safeCadencePage * CADENCE_PAGE_SIZE + CADENCE_PAGE_SIZE,
-    cadence.length,
-  );
 
   const headlineTone = overdue.length > 0
     ? `${overdue.length} overdue · ${myOpen.length} on your plate`
@@ -440,12 +877,7 @@ export function Dashboard({
 
   return (
     <div className="min-w-0">
-      {/* ── HEADER ───────────────────────────────────────────────
-          Same chrome rhythm as Board / Backlog / Reports — title +
-          meta chips on a hairline-bottomed surface. The personalized
-          greeting lives in the subtitle, not the hero, so the page
-          reads as one of the app's tabs rather than a separate site. */}
-      <div className="-mx-3 sm:-mx-6 mb-5 px-3 sm:px-6 pt-3.5 pb-3 bg-surface-elevated border-b border-border-soft">
+      <div className="-mx-3 sm:-mx-6 mb-5 px-3 sm:px-6 pt-3.5 pb-0 bg-surface-elevated border-b border-border-soft">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <h1 className="font-display text-[24px] font-semibold tracking-[-0.022em] text-fg m-0">
@@ -493,208 +925,32 @@ export function Dashboard({
             )}
           </div>
         )}
+        <TabBar active={activeTab} onChange={onTabChange} />
       </div>
 
-      <div className="max-w-[1180px] mx-auto pb-10 grid gap-5 sm:gap-6">
-        {/* ── PULSE ────────────────────────────────────────────── */}
-        <section>
-          <Eyebrow className="mb-2 px-1">Pulse</Eyebrow>
-          <div data-stagger className="luxe-card grid grid-cols-3 overflow-hidden">
-            <PulseCell
-              index={0}
-              label="Open"
-              value={openTasks.length}
-              hint={
-                openTasks.length === 0
-                  ? "All clear."
-                  : `${tasks.length - openTasks.length} of ${tasks.length} closed`
-              }
-            />
-            <PulseCell
-              index={1}
-              label="Assigned to you"
-              value={myOpen.length}
-              hint={
-                myOpen.length === 0
-                  ? "Inbox zero."
-                  : `${myOpen.reduce((s, t) => s + weightOf(t, { mode }), 0)} ${unit === "d" ? "working days" : "story points"}`
-              }
-              tone={myOpen.length > 5 ? "warning" : "default"}
-            />
-            <PulseCell
-              index={2}
-              label="Overdue"
-              value={overdue.length}
-              hint={
-                overdue.length === 0
-                  ? "Nothing past due."
-                  : `Oldest ${dueLabel(overdue[0]?.due, today).toLowerCase()}`
-              }
-              tone={overdue.length > 0 ? "danger" : "default"}
-            />
-          </div>
-        </section>
-
-        {activeSprint && (
-          <section>
-            <SprintHealthTile
-              projectId={project?.id}
-              activeSprint={activeSprint}
-            />
-          </section>
-        )}
-
-        {/* ── TODAY ────────────────────────────────────────────── */}
-        <section>
-          <div className="flex items-baseline justify-between mb-2 px-1">
-            <Eyebrow>Today &amp; the next three days</Eyebrow>
-            {focus.length > 0 && (
-              <span className="text-[11.5px] text-fg-subtle">
-                {focus.length} {focus.length === 1 ? "item" : "items"}
-              </span>
-            )}
-          </div>
-          {focus.length === 0 ? (
-            <div className="luxe-card px-5 py-7 text-center">
-              <h3 className="font-display text-[16px] font-semibold tracking-[-0.018em] text-fg m-0">
-                A clear horizon
-              </h3>
-              <p className="mt-2 text-[13px] text-fg-subtle">
-                No deadlines in the next three days. Use the lull to refine the backlog.
-              </p>
-            </div>
-          ) : (
-            <ul className="luxe-card overflow-hidden m-0 p-0 list-none">
-              {focus.map(({ t, due }, i) => {
-                const showHeader =
-                  i === 0 ||
-                  (focus[i - 1].group !== "overdue" && focus[i].group === "overdue") ||
-                  (focus[i - 1].group !== "today" && focus[i].group === "today");
-                return (
-                  <div key={t.id}>
-                    {showHeader && (
-                      <div className="px-4 pt-3 pb-1 bg-surface-subtle/50 border-b border-border-soft">
-                        <Eyebrow>
-                          {focus[i].group === "overdue"
-                            ? `Overdue (${overdue.length})`
-                            : `Due soon (${dueToday.length})`}
-                        </Eyebrow>
-                      </div>
-                    )}
-                    <TodayItem task={t} onClick={onTaskClick} now={today} />
-                  </div>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        {/* ── TOP ASSIGNEES ────────────────────────────────────── */}
-        {topAssignees.length > 0 && (
-          <section>
-            <div className="flex items-baseline justify-between mb-2 px-1">
-              <Eyebrow>
-                {useTopPoints
-                  ? unit === "d"
-                    ? "Working days by member"
-                    : "Story points by member"
-                  : "Top assignees"}
-              </Eyebrow>
-              <button
-                type="button"
-                onClick={() => onChangeView?.("members")}
-                className="text-[11.5px] text-fg-subtle hover:text-fg transition-colors"
-              >
-                See team →
-              </button>
-            </div>
-            <ul className="luxe-card overflow-hidden m-0 p-0 list-none">
-              {visibleTopAssignees.map((a) => {
-                const pct = useTopPoints
-                  ? topMaxPoints > 0
-                    ? Math.max(2, ((a.points || 0) / topMaxPoints) * 100)
-                    : 0
-                  : topMaxCount > 0
-                  ? Math.max(2, (a.count / topMaxCount) * 100)
-                  : 0;
-                return (
-                  <li
-                    key={a.id}
-                    className="flex items-center gap-3 px-4 py-3 border-b border-border-soft last:border-b-0"
-                  >
-                    <Avatar user={a} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13.5px] text-fg truncate leading-tight">
-                        {a.name}
-                      </div>
-                      <div className="mt-2 h-1.5 rounded-full bg-surface-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-accent transition-[width] duration-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0 min-w-16">
-                      <div className="font-display text-[16px] font-semibold tabular-nums text-fg leading-none">
-                        {useTopPoints ? a.points || 0 : a.count}
-                      </div>
-                      <div className="text-[10.5px] text-fg-faint mt-1 uppercase tracking-[0.12em]">
-                        {useTopPoints
-                          ? `${unit} · ${a.count} open`
-                          : a.count === 1
-                          ? "open"
-                          : "open"}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            <SectionPager
-              page={safeTopPage}
-              pageCount={topPageCount}
-              label={`Showing ${topRangeStart}–${topRangeEnd} of ${topAssignees.length}`}
-              onPrev={() => setTopPage((p) => Math.max(0, p - 1))}
-              onNext={() => setTopPage((p) => Math.min(topPageCount - 1, p + 1))}
-            />
-          </section>
-        )}
-
-        {/* ── CADENCE ──────────────────────────────────────────── */}
-        {cadence.length > 0 && (
-          <section>
-            <div className="flex items-baseline justify-between mb-2 px-1">
-              <Eyebrow>Cadence</Eyebrow>
-              <button
-                type="button"
-                onClick={() => onChangeView?.("backlog")}
-                className="text-[11.5px] text-fg-subtle hover:text-fg transition-colors"
-              >
-                See all sprints →
-              </button>
-            </div>
-            <div className="board-scroller -mx-3 sm:-mx-6 px-3 sm:px-6 pb-2 flex gap-4 overflow-x-auto">
-              {visibleCadence.map((sp) => (
-                <CadenceCard
-                  key={sp.id}
-                  sp={sp}
-                  isActive={activeSprint?.id === sp.id}
-                  onOpen={() => onChangeView?.("backlog")}
-                />
-              ))}
-            </div>
-            <SectionPager
-              page={safeCadencePage}
-              pageCount={cadencePageCount}
-              label={`Showing ${cadenceRangeStart}–${cadenceRangeEnd} of ${cadence.length} sprints`}
-              onPrev={() => setCadencePage((p) => Math.max(0, p - 1))}
-              onNext={() =>
-                setCadencePage((p) => Math.min(cadencePageCount - 1, p + 1))
-              }
-            />
-          </section>
-        )}
-      </div>
+      {activeTab === "overview" ? (
+        <OverallTab
+          project={project}
+          activeSprint={activeSprint}
+          sprints={sprints}
+          tasks={tasks}
+          mode={mode}
+          unit={unit}
+          onChangeView={onChangeView}
+          onTaskClick={onTaskClick}
+        />
+      ) : (
+        <MyWorkTab
+          currentUser={currentUser}
+          tasks={tasks}
+          sprints={sprints}
+          activeSprint={activeSprint}
+          mode={mode}
+          unit={unit}
+          onTaskClick={onTaskClick}
+          onChangeView={onChangeView}
+        />
+      )}
     </div>
   );
 }

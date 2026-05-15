@@ -170,7 +170,7 @@ docker compose up -d --build
 | `OPENPROJECT_WORKING_DAYS` | optional | Comma-separated day prefixes for burndown / capacity (default `Mon,Tue,Wed,Thu,Fri`). |
 | `HOURS_PER_POINT` | optional | Hours-per-point for the capacity view (default `4`). |
 | `OPIRA_TEST_DB_URL` | optional | Connection string used by the schema canary + DB integration tests (skipped when unset). |
-| `OPIRA_REDIS_URL` | optional | Redis connection string for the [planning-poker](#-planning-poker) rooms. Unset → in-memory single-pod store. Set → rooms persist across pods with a 30-min idle TTL. Server-only. |
+| `OPIRA_REDIS_URL` | optional | Redis connection string. Used for two things: **lookup caching** (statuses, types, priorities, schemas, t-shirt options — 30–60 min TTL, shared across pods) and **planning-poker** rooms (30-min idle TTL, pub/sub fan-out). Unset → both fall back to in-process Maps. Server-only. |
 
 All env vars are read at request time on the server. Values the client needs (`OPENPROJECT_URL`, `OPENPROJECT_STORY_POINTS_FIELD`, `OPENPROJECT_WORKING_DAYS`, plus a read-only `dataSource` indicator) are surfaced through React context — no `NEXT_PUBLIC_*` baking, no rebuild to change envs. Server-only secrets (`AUTH_SECRET`, OAuth client secret, `OPENPROJECT_DB_URL`) **never reach the browser**.
 
@@ -269,7 +269,30 @@ docker compose up -d
 
 The bundled Redis is hardened for the poker workload: 64 MB memory cap with `allkeys-lru` eviction, AOF persistence on a `redis-data` volume so a container restart mid-vote doesn't reset live rooms, no port mapping (the Compose network is the auth boundary — there's no password). Inspect with `docker compose exec redis redis-cli`.
 
-If you'd rather not run Redis at all, leave `OPIRA_REDIS_URL` unset — Opira falls back to the in-memory store. The Redis container will still come up unused; remove it from `docker-compose.yml` if you want to skip it entirely.
+If you'd rather not run Redis at all, leave `OPIRA_REDIS_URL` unset — Opira falls back to the in-memory store for both poker and lookup caching. The Redis container will still come up unused; remove it from `docker-compose.yml` if you want to skip it entirely.
+
+### Lookup caching in Redis
+
+When `OPIRA_REDIS_URL` is set, Opira caches OpenProject metadata that rarely changes across all pods:
+
+| Data | TTL | Cache key pattern |
+|---|---|---|
+| Statuses, priorities | 30 min | `opira:lookups:statuses`, `opira:lookups:priorities` |
+| Types | 30 min | `opira:lookups:types:{projectId\|__global__}` |
+| Work-package schema | 60 min | `opira:lookups:schema:{projectId}-{typeId}` |
+| T-shirt size options | 30 min | `opira:lookups:custom-options:{href}` |
+
+Each pod also keeps a 5-minute in-process copy so Redis round-trips only happen on first load per pod. The cache degrades gracefully — if Redis is unreachable the in-process Map serves the request.
+
+If an OpenProject admin changes types, statuses, or custom fields and you need immediate effect, flush the cache without restarting:
+
+```bash
+curl -X DELETE https://your-opira.example.com/api/openproject/lookups/cache \
+  -H "Cookie: <your session cookie>"
+# → { "ok": true, "deleted": 5 }
+```
+
+In-process caches drain naturally within 5 minutes after the DELETE.
 
 ---
 
@@ -364,6 +387,8 @@ opira/
 ├─ components/{ui/,*.jsx}                shared primitives + feature components
 ├─ lib/
 │  ├─ data/                              repository layer (api/, db/, authz/, ports/)
+│  │  ├─ api/lookup-repository.api.cached.js   Redis+in-process cache wrapper for lookups
+│  │  └─ redis-lookups-cache.js                get/set/flush helpers for opira:lookups:* keys
 │  ├─ hooks/                             TanStack Query wrappers
 │  ├─ openproject/                       HAL client + mappers + helpers
 │  └─ {offline,server}/
@@ -450,7 +475,7 @@ Conventional prefixes: `feat:` · `fix:` · `refactor:` · `docs:` · `chore:` �
 <details>
 <summary><strong>Does Opira store any of my data?</strong></summary>
 
-No. Opira owns no application database, no cache server, no analytics. Every screen reads live from your OpenProject instance, every mutation is round-tripped to it. The only persistent state Opira owns is your signed session cookie. (In `hybrid` mode Opira reads directly from *OpenProject's* PostgreSQL — that's still **your** OP server's database, not a separate Opira store.)
+No. Opira owns no application database and collects no analytics. Every screen reads from your OpenProject instance and every mutation is round-tripped to it. The only persistent state Opira owns is your signed session cookie. If you opt in to `OPIRA_REDIS_URL`, Opira writes short-lived cache entries (lookup metadata, poker rooms) into Redis under the `opira:` namespace — these are ephemeral and safe to delete at any time. (In `hybrid` mode Opira reads directly from *OpenProject's* PostgreSQL — that's still **your** OP server's database, not a separate Opira store.)
 </details>
 
 <details>
