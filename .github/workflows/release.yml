@@ -60,8 +60,6 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/opira
           tags: |
             type=semver,pattern={{version}},value=${{ github.event.inputs.tag || github.ref_name }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ github.event.inputs.tag || github.ref_name }}
-            type=raw,value=latest
           labels: |
             org.opencontainers.image.title=opira
             org.opencontainers.image.description=Modern Jira-style frontend for OpenProject, built with Next.js.
