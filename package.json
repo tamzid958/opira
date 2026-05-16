@@ -1,9 +1,14 @@
 {
   "name": "opira",
   "version": "2.0.0",
-  "description": "Opira — a modern, opinionated UI for OpenProject. Sprint board, backlog, timeline, reports and more, served from a Next.js App Router app over the OpenProject OAuth + v3 API.",
+  "description": "Modern Jira-style frontend for OpenProject, built with Next.js.",
   "private": true,
   "license": "MIT",
+  "packageManager": "npm@10",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
   "author": {
     "name": "Tamzid Ahmed"
   },
@@ -18,11 +23,8 @@
   "keywords": [
     "opira",
     "openproject",
-    "openproject-jira-theme",
-    "jira",
-    "jira-theme",
+    "jira-style",
     "project-management",
-    "sprint-board",
     "kanban",
     "scrum",
     "backlog",
