@@ -331,7 +331,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
   return (
     <div
       data-app-shell
-      className="grid grid-cols-[224px_minmax(0,1fr)] grid-rows-[48px_minmax(0,1fr)] h-screen w-screen overflow-hidden"
+      className="grid grid-cols-[216px_minmax(0,1fr)] lg:grid-cols-[224px_minmax(0,1fr)] grid-rows-[48px_minmax(0,1fr)] h-dvh w-full max-w-full overflow-hidden"
     >
       <Topbar
         canCreate={canCreateIssue}
@@ -352,7 +352,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
         onSwitchProject={() => setSidebarOpen(false)}
         projects={projectsQ.data || []}
       />
-      <div className="row-start-2 row-end-3 col-start-2 col-end-3 overflow-hidden flex flex-col bg-surface-app">
+      <div className="row-start-2 row-end-3 col-start-2 col-end-3 min-w-0 overflow-hidden flex flex-col bg-surface-app">
         {children}
       </div>
 

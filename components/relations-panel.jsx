@@ -191,7 +191,7 @@ export function RelationsPanel({
                 key={r.id}
                 className="flex items-center gap-2 -mx-2 px-2 py-1 rounded-md hover:bg-surface-subtle transition-colors"
               >
-                <span className="w-22 shrink-0">
+                <span className="w-18 sm:w-22 shrink-0">
                   <VerbChip verb={r.verb} label={r.label} />
                 </span>
                 <span className="grid place-items-center text-fg-subtle shrink-0">
@@ -246,7 +246,7 @@ export function RelationsPanel({
                 const r = typeBtnRef.current?.getBoundingClientRect();
                 if (r) setTypeMenu(r);
               }}
-              className="inline-flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium whitespace-nowrap bg-accent-50 text-accent-700 hover:bg-accent-100 cursor-pointer w-22 justify-between"
+              className="inline-flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium whitespace-nowrap bg-accent-50 text-accent-700 hover:bg-accent-100 cursor-pointer w-18 sm:w-22 justify-between"
             >
               <span className="truncate">{RELATION_LABELS[pendingType] || pendingType}</span>
               <Icon name="chev-down" size={11} aria-hidden="true" />
@@ -300,7 +300,7 @@ export function RelationsPanel({
           anchorRect={targetMenu}
           onClose={() => setTargetMenu(null)}
           onSelect={(it) => onPickTarget(it.value)}
-          width={360}
+          width={320}
           maxHeight={300}
           searchable
           searchPlaceholder="Search work packages…"

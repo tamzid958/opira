@@ -9,7 +9,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 
 export function CenterStatus({ children, narrow = false }) {
   return (
-    <div className="grid place-items-center h-screen w-screen bg-surface-app p-6">
+    <div className="grid place-items-center h-dvh w-full bg-surface-app p-6">
       <div
         className={`luxe-card text-[14px] leading-relaxed text-fg p-7 sm:p-8 ${
           narrow ? "max-w-md" : "max-w-lg"

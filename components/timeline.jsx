@@ -29,7 +29,7 @@ const ZOOM = {
   week: { day: 28, label: "Week" },
 };
 
-const ROW_RAIL = "w-[180px] sm:w-[220px] md:w-[280px] shrink-0";
+const ROW_RAIL = "w-[128px] sm:w-[220px] md:w-[280px] shrink-0";
 const ROW_TASK_H = 28;
 const ROW_GROUP_H = 36;
 // Decorative separator on chart side for non-sprint group headers — much
@@ -492,18 +492,18 @@ export function Timeline({ tasks = [], sprints = [], assignees = [], onTaskClick
   return (
     <div className="flex flex-col h-full bg-surface-elevated rounded-lg border border-border overflow-hidden">
       {/* ── Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 sm:px-4 py-2 border-b border-border bg-surface-elevated shrink-0 flex-wrap">
+      <div className="touch-toolbar flex items-center gap-2 px-3 sm:px-4 py-2 border-b border-border bg-surface-elevated shrink-0">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className="text-[12px] text-fg font-semibold tabular-nums">
             {format(rangeStart, "MMM d")} – {format(rangeEnd, "MMM d, yyyy")}
           </span>
-          <span className="text-[11px] text-fg-faint">
+          <span className="hidden sm:inline text-[11px] text-fg-faint">
             {dated.length} on chart
             {undated.length > 0 && ` · ${undated.length} undated`}
           </span>
         </div>
 
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
+        <div className="ml-auto flex items-center gap-2">
           <div className="inline-flex items-center gap-1.5">
             <span className="text-[11px] font-medium text-fg-subtle">Group</span>
             <div className="inline-flex rounded-md border border-border bg-surface-elevated p-0.5">

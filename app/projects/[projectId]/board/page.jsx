@@ -557,7 +557,7 @@ export default function BoardPage({ params: paramsPromise }) {
               {Math.max(0, activeSprint.days - activeSprint.dayIn)} days left
             </span>
           )}
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="md:ml-auto flex items-center gap-1.5">
             <button
               type="button"
               onClick={(e) =>
@@ -577,7 +577,7 @@ export default function BoardPage({ params: paramsPromise }) {
       {/* Filter bar — same chip pattern as Backlog so the two views feel
           consistent. Search + assignee + type + tag chips, all driven by
           URL search params so links are shareable. */}
-      <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 py-3 flex items-center gap-2 flex-wrap shrink-0">
+      <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 py-3 flex items-center gap-2 touch-toolbar shrink-0">
         <div className="relative">
           <Icon
             name="search"
@@ -705,7 +705,7 @@ export default function BoardPage({ params: paramsPromise }) {
           <Icon name="clock" size={13} aria-hidden="true" />
           Recent
         </button>
-        <div className="ml-auto inline-flex h-7 rounded-md border border-border-soft bg-surface-elevated p-0.5 overflow-hidden">
+        <div className="md:ml-auto inline-flex h-7 rounded-md border border-border-soft bg-surface-elevated p-0.5 overflow-hidden">
           {[
             { id: "kanban", label: "Kanban", icon: "board" },
             { id: "list", label: "List", icon: "list" },

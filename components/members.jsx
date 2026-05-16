@@ -563,7 +563,7 @@ export function Members({ projectId, projectName }) {
 
       {/* List card */}
       <div className="bg-surface-elevated border border-border rounded-xl overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border-soft bg-surface-sunken">
+        <div className="touch-toolbar flex items-center gap-2 px-4 py-2.5 border-b border-border-soft bg-surface-sunken">
           <div className="relative">
             <Icon
               name="search"
@@ -575,7 +575,7 @@ export function Members({ projectId, projectName }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by name, email or role…"
-              className="w-80 h-7 pl-7 pr-2 rounded-md border border-border bg-surface-elevated text-[12.5px] text-fg outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-100)]"
+              className="w-[min(20rem,58vw)] sm:w-80 h-7 pl-7 pr-2 rounded-md border border-border bg-surface-elevated text-[12.5px] text-fg outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-100)]"
             />
           </div>
           <div className="inline-flex rounded-md border border-border bg-surface-elevated p-0.5">

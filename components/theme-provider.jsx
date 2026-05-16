@@ -2,18 +2,29 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
-// Theme system. The four modes map to `data-theme` values on `<html>`:
+// Theme system. The visual modes map to `data-theme` values on `<html>`:
 //   - "system" (preference, not a value) → resolves to "light" or "dark"
 //     based on the user's OS preference, and tracks live changes.
-//   - "light" / "dark"           → standard themes
+//   - "light" / "dark" / "sepia" / "paper-ink" / "terminal-mono"
+//                                 → standard themes
 //   - "hc-light" / "hc-dark"     → WCAG AAA high-contrast variants
 //
 // Persistence: `localStorage["opira:theme"]` stores the *preference*
-// ("system" | "light" | "dark" | "hc-light" | "hc-dark"). The applied
+// ("system" | "light" | "dark" | "sepia" | "paper-ink" | "terminal-mono" |
+//  "hc-light" | "hc-dark"). The applied
 // `data-theme` attribute is the resolved value; an inline FOUC-guard
 // script in `app/layout.jsx` sets it before React hydrates.
 
-export const THEME_PREFS = ["system", "light", "dark", "hc-light", "hc-dark"];
+export const THEME_PREFS = [
+  "system",
+  "light",
+  "dark",
+  "sepia",
+  "paper-ink",
+  "terminal-mono",
+  "hc-light",
+  "hc-dark",
+];
 export const STORAGE_KEY = "opira:theme";
 
 const ThemeContext = createContext({

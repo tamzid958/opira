@@ -191,7 +191,7 @@ export function Tags({ projectId, projectName, tasks, onFilter }) {
   return (
     <div className="max-w-6xl mx-auto">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
+      <div className="touch-toolbar flex items-center gap-2 mb-3">
         <div className="relative">
           <Icon
             name="search"
@@ -203,7 +203,7 @@ export function Tags({ projectId, projectName, tasks, onFilter }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search tags…"
-            className="w-64 h-8 pl-7 pr-2 rounded-md border border-border bg-surface-elevated text-[12.5px] text-fg outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-100)]"
+            className="w-[min(16rem,56vw)] sm:w-64 h-8 pl-7 pr-2 rounded-md border border-border bg-surface-elevated text-[12.5px] text-fg outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-100)]"
           />
         </div>
         <div className="inline-flex rounded-md border border-border bg-surface-elevated p-0.5">

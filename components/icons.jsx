@@ -59,6 +59,9 @@ import {
   WifiOff,
   CloudUpload,
   Download,
+  Palette,
+  FileText,
+  Terminal,
 } from "lucide-react";
 
 const STAR_FILLED = (props) => <Star {...props} fill="currentColor" strokeWidth={0} />;
@@ -124,6 +127,9 @@ const NAME_TO_ICON = {
   "wifi-off": WifiOff,
   "cloud-upload": CloudUpload,
   download: Download,
+  palette: Palette,
+  "file-text": FileText,
+  terminal: Terminal,
 };
 
 export function Icon({ name, size = 16, className = "", style }) {

@@ -51,7 +51,7 @@ function SubtaskRow({
   return (
     <>
       <div
-        className="grid grid-cols-[16px_18px_100px_minmax(0,1fr)_100px_minmax(80px,140px)_28px_28px] gap-2 items-center -mx-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-subtle transition-colors"
+        className="subtask-row -mx-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-subtle transition-colors"
         style={{ paddingLeft: 8 + depth * 20 }}
       >
         <span
@@ -74,13 +74,13 @@ function SubtaskRow({
           <TypeIcon name={task.typeName} color={task.typeColor} size={13} />
         </span>
 
-        <span className="font-mono text-[11px] text-fg-subtle truncate">{task.key}</span>
+        <span className="hidden md:block font-mono text-[11px] text-fg-subtle truncate">{task.key}</span>
 
         <span
           onClick={() => onTaskClick?.(task.id)}
           title={task.title}
           className={cn(
-            "text-[13px] truncate",
+            "text-[13px] truncate min-w-0",
             isDone ? "text-fg-subtle line-through" : "text-fg",
             onTaskClick ? "cursor-pointer" : "cursor-default",
           )}
@@ -112,7 +112,7 @@ function SubtaskRow({
               : taskSprintLabel || "Assign to sprint"
           }
           className={cn(
-            "inline-flex items-center gap-1 px-2 h-6 rounded-md text-[11.5px] truncate min-w-0",
+            "hidden md:inline-flex items-center gap-1 px-2 h-6 rounded-md text-[11.5px] truncate min-w-0",
             editable ? "cursor-pointer" : "cursor-default",
             task.sprint
               ? "bg-accent-50 text-accent-700 hover:bg-accent-100"

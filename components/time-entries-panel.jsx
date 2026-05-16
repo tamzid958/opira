@@ -117,13 +117,13 @@ export function TimeEntriesPanel({ wpId, currentUserId, canLog = true }) {
             return (
               <div
                 key={e.id}
-                className="grid grid-cols-[140px_minmax(0,1fr)_70px_28px] items-center gap-2 py-1.5 border-b border-border-soft last:border-b-0 text-[13px]"
+                className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[140px_minmax(0,1fr)_70px_28px] items-start sm:items-center gap-2 py-1.5 border-b border-border-soft last:border-b-0 text-[13px]"
               >
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 col-start-1 row-start-1">
                   <Avatar user={user} size="sm" />
                   <span className="text-fg-subtle text-xs">{e.spentOn}</span>
                 </span>
-                <span className="text-fg-muted truncate" title={e.comment}>
+                <span className="text-fg-muted truncate col-start-1 row-start-2 sm:col-auto sm:row-auto" title={e.comment}>
                   {e.activityName ? (
                     <span className="text-fg-subtle text-[11px] mr-1.5 px-1 py-0.5 rounded bg-surface-subtle">
                       {e.activityName}
@@ -131,7 +131,7 @@ export function TimeEntriesPanel({ wpId, currentUserId, canLog = true }) {
                   ) : null}
                   {e.comment || (e.activityName ? "" : "—")}
                 </span>
-                <span className="text-right font-mono text-xs text-fg">
+                <span className="text-right font-mono text-xs text-fg col-start-2 row-start-1 sm:col-auto sm:row-auto">
                   {formatDurationShort(e.hoursIso)}
                 </span>
                 {e.permissions?.delete !== false && e.user === currentUserId ? (
@@ -148,7 +148,7 @@ export function TimeEntriesPanel({ wpId, currentUserId, canLog = true }) {
                         );
                       }
                     }}
-                    className="grid place-items-center w-6.5 h-6.5 rounded text-fg-subtle hover:bg-surface-subtle hover:text-pri-highest cursor-pointer justify-self-end"
+                    className="grid place-items-center w-6.5 h-6.5 rounded text-fg-subtle hover:bg-surface-subtle hover:text-pri-highest cursor-pointer justify-self-end col-start-2 row-start-2 sm:col-auto sm:row-auto"
                   >
                     <Icon name="trash" size={12} aria-hidden="true" />
                   </button>
@@ -176,7 +176,7 @@ export function TimeEntriesPanel({ wpId, currentUserId, canLog = true }) {
 
       {showForm && canLog && (
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-3 mt-3">
-          <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-[120px_minmax(0,1fr)] gap-3">
             <div>
               <label className={LABEL}>Hours</label>
               <input

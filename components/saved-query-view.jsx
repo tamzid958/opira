@@ -125,15 +125,17 @@ export function SavedQueryView({ queryId, projectId }) {
                     ? `/projects/${projectId}/board?wp=${wp.nativeId}`
                     : `?wp=${wp.nativeId}`
                 }
-                className="grid grid-cols-[80px_minmax(0,1fr)_120px_28px_70px] items-center gap-3 px-3 py-2 border-b border-border-soft last:border-b-0 hover:bg-surface-subtle no-underline"
+                className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[80px_minmax(0,1fr)_120px_28px_70px] items-start sm:items-center gap-2 sm:gap-3 px-3 py-2 border-b border-border-soft last:border-b-0 hover:bg-surface-subtle no-underline"
               >
-                <span className="text-[11px] font-mono text-fg-subtle">{wp.key}</span>
-                <span className="text-[13px] text-fg truncate">{wp.title || "(untitled)"}</span>
-                <span>
+                <span className="text-[11px] font-mono text-fg-subtle col-start-1 row-start-1 sm:col-auto sm:row-auto">{wp.key}</span>
+                <span className="text-[13px] text-fg truncate col-start-1 row-start-2 sm:col-auto sm:row-auto">{wp.title || "(untitled)"}</span>
+                <span className="col-start-2 row-start-1 sm:col-auto sm:row-auto">
                   <TaskStatusPill task={wp} />
                 </span>
-                <Avatar user={assignee} size="sm" />
-                <span className="text-right font-mono text-xs tabular-nums text-fg-muted">
+                <span className="col-start-2 row-start-2 sm:col-auto sm:row-auto justify-self-end sm:justify-self-auto">
+                  <Avatar user={assignee} size="sm" />
+                </span>
+                <span className="hidden sm:inline text-right font-mono text-xs tabular-nums text-fg-muted">
                   {formatEstimate(wp, { mode: estimateMode }) ?? "—"}
                 </span>
               </Link>

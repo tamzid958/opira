@@ -459,7 +459,7 @@ export function TaskDetail({
               <span className="text-fg-subtle">Issues</span>
             )}
             <span className="text-fg-faint">/</span>
-            <span className="flex items-center gap-1.5 text-fg whitespace-nowrap">
+            <span className="flex items-center gap-1.5 text-fg min-w-0">
               <TaskTypeIcon task={task} size={12} /> {task.key}
               {carryOver && <CarryOverChip entry={carryOver} />}
             </span>

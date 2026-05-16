@@ -238,6 +238,123 @@ function MilestoneRow({ milestone, childTasks, sprints, onTaskClick }) {
   );
 }
 
+function MobileChildCard({ task, sprints, onClick }) {
+  const sprint = sprintName(task, sprints);
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(task.id)}
+      className="w-full text-left rounded-md border border-border-soft bg-surface-app/50 px-3 py-2.5"
+    >
+      <div className="flex items-start gap-2 min-w-0">
+        <TaskTypeIcon task={task} size={12} />
+        <div className="min-w-0 flex-1">
+          <div className="text-[12.5px] text-fg truncate">{task.title}</div>
+          <div className="mt-1 flex items-center gap-1.5 text-[10.5px] text-fg-subtle">
+            <span className="font-mono">{task.key}</span>
+            {sprint ? <span className="truncate">{sprint}</span> : null}
+          </div>
+        </div>
+        <TaskStatusPill task={task} />
+      </div>
+    </button>
+  );
+}
+
+function MobileMilestoneCard({ milestone, childTasks, sprints, onTaskClick }) {
+  const [open, setOpen] = useState(true);
+  const { aiEnabled } = usePublicConfig();
+  const sprint = sprintName(milestone, sprints);
+  const childCount = childTasks.length;
+  const closedCount = childTasks.filter((c) => c.statusIsClosed).length;
+  const overdueItems = childTasks
+    .filter((c) => !c.statusIsClosed && c.dueDate && c.dueDate < new Date().toISOString().slice(0, 10))
+    .map((c) => c.title);
+  const blockedItems = childTasks
+    .filter((c) => !c.statusIsClosed && c.statusName?.toLowerCase().includes("block"))
+    .map((c) => c.title);
+
+  return (
+    <div className="rounded-lg border border-border bg-surface-elevated overflow-hidden">
+      <button
+        type="button"
+        className="w-full px-3 py-3 text-left hover:bg-surface-subtle"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div className="flex items-start gap-2">
+          <ChevronRight
+            size={14}
+            className={cn("mt-0.5 shrink-0 text-fg-muted transition-transform", open && "rotate-90")}
+          />
+          <Flag size={13} className="mt-0.5 shrink-0 text-accent" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold text-fg truncate">{milestone.title}</div>
+            <div className="mt-1 flex items-center gap-1.5 text-[10.5px] text-fg-subtle">
+              <span className="font-mono">{milestone.key}</span>
+              <span>{closedCount}/{childCount}</span>
+              {sprint ? <span className="truncate">{sprint}</span> : null}
+            </div>
+          </div>
+          <TaskStatusPill task={milestone} />
+        </div>
+      </button>
+
+      <div className="px-3 pb-3">
+        <div className="grid grid-cols-2 gap-2 text-[11px] text-fg-subtle mb-2">
+          <span>Start: {formatAbsDate(milestone.startDate, "—")}</span>
+          <span>Target: {formatAbsDate(milestone.dueDate, "—")}</span>
+        </div>
+        <ProgressBar done={milestone.percentageDone} />
+      </div>
+
+      {open && (
+        <div className="border-t border-border-soft px-3 py-3 grid gap-2">
+          {childTasks.length > 0 ? (
+            childTasks.map((child) => (
+              <MobileChildCard
+                key={child.id}
+                task={child}
+                sprints={sprints}
+                onClick={onTaskClick}
+              />
+            ))
+          ) : (
+            <div className="text-[12px] text-fg-subtle italic">No child issues</div>
+          )}
+
+          {aiEnabled && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              <AiSuggestButton
+                mode="milestone-status"
+                label="Draft status update"
+                variant="copy"
+                payload={{
+                  milestoneTitle: milestone.title,
+                  dueDate: milestone.dueDate || undefined,
+                  percentDone: milestone.percentageDone ?? undefined,
+                  childSummary: `${closedCount} of ${childCount} tasks complete`,
+                }}
+              />
+              <AiSuggestButton
+                mode="milestone-risk"
+                label="Identify risks"
+                variant="copy"
+                payload={{
+                  milestoneTitle: milestone.title,
+                  dueDate: milestone.dueDate || undefined,
+                  percentDone: milestone.percentageDone ?? undefined,
+                  overdueItems,
+                  blockedItems,
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────
 
 export function Milestones({ tasks, sprints, onTaskClick }) {
@@ -275,45 +392,59 @@ export function Milestones({ tasks, sprints, onTaskClick }) {
   }
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden bg-surface-elevated">
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="bg-surface-subtle">
-            <th className="py-2.5 pl-3 pr-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider">
-              Title
-            </th>
-            <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
-              Status
-            </th>
-            <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
-              Start
-            </th>
-            <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
-              Target
-            </th>
-            <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
-              Sprint
-            </th>
-            <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
-              Assignee
-            </th>
-            <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
-              Progress
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((milestone) => (
-            <MilestoneRow
-              key={milestone.id}
-              milestone={milestone}
-              childTasks={childMap.get(String(milestone.nativeId)) || []}
-              sprints={sprints}
-              onTaskClick={onTaskClick}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="md:hidden grid gap-3">
+        {sorted.map((milestone) => (
+          <MobileMilestoneCard
+            key={milestone.id}
+            milestone={milestone}
+            childTasks={childMap.get(String(milestone.nativeId)) || []}
+            sprints={sprints}
+            onTaskClick={onTaskClick}
+          />
+        ))}
+      </div>
+
+      <div className="hidden md:block rounded-lg border border-border overflow-hidden bg-surface-elevated">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-surface-subtle">
+              <th className="py-2.5 pl-3 pr-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider">
+                Title
+              </th>
+              <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
+                Status
+              </th>
+              <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
+                Start
+              </th>
+              <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
+                Target
+              </th>
+              <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
+                Sprint
+              </th>
+              <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
+                Assignee
+              </th>
+              <th className="py-2.5 px-3 text-[11px] font-semibold text-fg-muted uppercase tracking-wider whitespace-nowrap">
+                Progress
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((milestone) => (
+              <MilestoneRow
+                key={milestone.id}
+                milestone={milestone}
+                childTasks={childMap.get(String(milestone.nativeId)) || []}
+                sprints={sprints}
+                onTaskClick={onTaskClick}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

@@ -512,6 +512,9 @@ input, textarea, select { font-family: inherit; }
  * The app reads `data-theme` on the `<html>` element. Values:
  *   - light            (default — ivory marble)
  *   - dark             (graphite + platinum)
+ *   - sepia            (warm parchment + espresso ink)
+ *   - paper-ink        (editorial paper + hard ink)
+ *   - terminal-mono    (graphite + phosphor accents)
  *   - hc-light         (high-contrast light, WCAG AAA)
  *   - hc-dark          (high-contrast dark, WCAG AAA)
  *
@@ -602,6 +605,205 @@ input, textarea, select { font-family: inherit; }
   --card-grounding: 0 1px 0 rgba(0, 0, 0, 0.5);
 
   color-scheme: dark;
+}
+
+/* Sepia: warm parchment background + dark-ink chrome to reduce glare on
+   long backlog sessions while keeping familiar light-mode contrast. */
+[data-theme="sepia"] {
+  --color-surface:           #f8f1e4;
+  --color-surface-app:       #f2e9d8;
+  --color-surface-subtle:    #ebdfcb;
+  --color-surface-muted:     #e3d5bf;
+  --color-surface-board:     #f4ead9;
+  --color-surface-column:    #ebdfcb;
+  --color-surface-elevated:  #fbf5e9;
+  --color-surface-sunken:    #efe3d1;
+
+  --color-border:        rgba(61, 42, 24, 0.18);
+  --color-border-strong: rgba(61, 42, 24, 0.28);
+  --color-border-soft:   rgba(61, 42, 24, 0.10);
+
+  --color-fg:        #2c1d12;
+  --color-fg-muted:  #4f3826;
+  --color-fg-subtle: #715640;
+  --color-fg-faint:  #96775e;
+
+  --color-accent:     #3b2414;
+  --color-accent-50:  rgba(59, 36, 20, 0.08);
+  --color-accent-100: rgba(59, 36, 20, 0.16);
+  --color-accent-200: rgba(59, 36, 20, 0.26);
+  --color-accent-600: #52331e;
+  --color-accent-700: #6a4328;
+  --color-on-accent:  #fff9f0;
+
+  --color-status-todo:     #715640;
+  --color-status-progress: #3e332a;
+  --color-status-review:   #6b4c86;
+  --color-status-done:     #2f6a4f;
+  --color-status-blocked:  #93473a;
+
+  --color-status-todo-bg: #e7d9c3;        --color-status-todo-fg: #4f3826;
+  --color-status-progress-bg: #e2d4c2;    --color-status-progress-fg: #2c1d12;
+  --color-status-review-bg: #e8ddef;      --color-status-review-fg: #5a3d73;
+  --color-status-done-bg: #d8e7dc;        --color-status-done-fg: #24533d;
+  --color-status-blocked-bg: #efd7d2;     --color-status-blocked-fg: #7a342a;
+
+  --color-tag-bug-bg: #efd7d2;       --color-tag-bug-fg: #7a342a;
+  --color-tag-frontend-bg: #ddd8ea;  --color-tag-frontend-fg: #3e3b5a;
+  --color-tag-backend-bg: #efe2c8;   --color-tag-backend-fg: #5b4520;
+  --color-tag-design-bg: #e8ddef;    --color-tag-design-fg: #5a3d73;
+  --color-tag-test-bg: #d8e7dc;      --color-tag-test-fg: #24533d;
+  --color-tag-docs-bg: #efdde0;      --color-tag-docs-fg: #6a3142;
+
+  --color-pri-highest: #93473a;
+  --color-pri-high:    #a86630;
+  --color-pri-medium:  #8f6f25;
+  --color-pri-low:     #2f6a4f;
+  --color-pri-lowest:  #715640;
+
+  --shadow-xs: 0 1px 1px rgba(59, 36, 20, 0.05);
+  --shadow-sm: 0 1px 2px rgba(59, 36, 20, 0.08);
+  --shadow-md: 0 8px 24px rgba(59, 36, 20, 0.11), 0 1px 3px rgba(59, 36, 20, 0.05);
+  --shadow-lg: 0 20px 42px rgba(59, 36, 20, 0.14), 0 2px 6px rgba(59, 36, 20, 0.06);
+  --shadow-xl: 0 34px 82px rgba(59, 36, 20, 0.18), 0 4px 14px rgba(59, 36, 20, 0.08);
+
+  --glass-bg: rgba(248, 241, 228, 0.78);
+  --glass-border: rgba(61, 42, 24, 0.15);
+  --scrim: rgba(44, 29, 18, 0.52);
+  --card-highlight: inset 0 1px 0 rgba(255, 251, 244, 0.7);
+  --card-grounding: 0 1px 0 rgba(59, 36, 20, 0.08);
+
+  color-scheme: light;
+}
+
+/* Paper Ink: editorial white paper with strong ink text and restrained
+   monochrome accents. */
+[data-theme="paper-ink"] {
+  --color-surface:           #fffdf8;
+  --color-surface-app:       #f8f4ea;
+  --color-surface-subtle:    #f1ecdf;
+  --color-surface-muted:     #e8e1d0;
+  --color-surface-board:     #fbf7ee;
+  --color-surface-column:    #f2ecdf;
+  --color-surface-elevated:  #fffcf6;
+  --color-surface-sunken:    #f2ead8;
+
+  --color-border:        rgba(6, 6, 6, 0.22);
+  --color-border-strong: rgba(6, 6, 6, 0.35);
+  --color-border-soft:   rgba(6, 6, 6, 0.15);
+
+  --color-fg:        #0d0d0d;
+  --color-fg-muted:  #222222;
+  --color-fg-subtle: #474747;
+  --color-fg-faint:  #6b6b6b;
+
+  --color-accent:     #050505;
+  --color-accent-50:  rgba(5, 5, 5, 0.08);
+  --color-accent-100: rgba(5, 5, 5, 0.15);
+  --color-accent-200: rgba(5, 5, 5, 0.28);
+  --color-accent-600: #1b1b1b;
+  --color-accent-700: #2e2e2e;
+  --color-on-accent:  #ffffff;
+
+  --color-status-todo:     #4b4b4b;
+  --color-status-progress: #1f1f1f;
+  --color-status-review:   #5d4c76;
+  --color-status-done:     #235b41;
+  --color-status-blocked:  #7a2f2c;
+
+  --color-status-todo-bg: #e7e4db;      --color-status-todo-fg: #2e2e2e;
+  --color-status-progress-bg: #dddddd;  --color-status-progress-fg: #161616;
+  --color-status-review-bg: #e8e0f0;    --color-status-review-fg: #4b3b63;
+  --color-status-done-bg: #d7e7de;      --color-status-done-fg: #1d4a35;
+  --color-status-blocked-bg: #efd8d7;   --color-status-blocked-fg: #662725;
+
+  --color-tag-bug-bg: #efd8d7;       --color-tag-bug-fg: #662725;
+  --color-tag-frontend-bg: #dfdfdf;  --color-tag-frontend-fg: #222222;
+  --color-tag-backend-bg: #ece4d0;   --color-tag-backend-fg: #4f3d1a;
+  --color-tag-design-bg: #e8e0f0;    --color-tag-design-fg: #4b3b63;
+  --color-tag-test-bg: #d7e7de;      --color-tag-test-fg: #1d4a35;
+  --color-tag-docs-bg: #eddde2;      --color-tag-docs-fg: #5b2b37;
+
+  --color-pri-highest: #7a2f2c;
+  --color-pri-high:    #92571f;
+  --color-pri-medium:  #78611a;
+  --color-pri-low:     #235b41;
+  --color-pri-lowest:  #4b4b4b;
+
+  --glass-bg: rgba(255, 253, 248, 0.86);
+  --glass-border: rgba(6, 6, 6, 0.18);
+  --scrim: rgba(6, 6, 6, 0.56);
+  --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --card-grounding: 0 1px 0 rgba(6, 6, 6, 0.08);
+
+  color-scheme: light;
+}
+
+/* Terminal Mono: neutral graphite dark with phosphor-like cyan/green
+   accents for strong status scannability. */
+[data-theme="terminal-mono"] {
+  --color-surface:           #090d0c;
+  --color-surface-app:       #050807;
+  --color-surface-subtle:    #0e1513;
+  --color-surface-muted:     #15201d;
+  --color-surface-board:     #070b0a;
+  --color-surface-column:    #0b1210;
+  --color-surface-elevated:  #0d1311;
+  --color-surface-sunken:    #070b0a;
+
+  --color-border:        rgba(115, 255, 205, 0.20);
+  --color-border-strong: rgba(115, 255, 205, 0.34);
+  --color-border-soft:   rgba(115, 255, 205, 0.10);
+
+  --color-fg:        #c5ffe4;
+  --color-fg-muted:  #8ee6c5;
+  --color-fg-subtle: #57ac8b;
+  --color-fg-faint:  #3b7d65;
+
+  --color-accent:     #73ffcd;
+  --color-accent-50:  rgba(115, 255, 205, 0.12);
+  --color-accent-100: rgba(115, 255, 205, 0.20);
+  --color-accent-200: rgba(115, 255, 205, 0.34);
+  --color-accent-600: #a7ffe2;
+  --color-accent-700: #53d6aa;
+  --color-on-accent:  #02130c;
+
+  --color-status-todo:     #74c6a7;
+  --color-status-progress: #73ffcd;
+  --color-status-review:   #7bc6ff;
+  --color-status-done:     #96ff8f;
+  --color-status-blocked:  #ff9f8f;
+
+  --color-status-todo-bg: #14211d;         --color-status-todo-fg: #9ce0c4;
+  --color-status-progress-bg: #11352b;     --color-status-progress-fg: #b6ffe9;
+  --color-status-review-bg: #13263b;       --color-status-review-fg: #b8dcff;
+  --color-status-done-bg: #173420;         --color-status-done-fg: #b8ffb2;
+  --color-status-blocked-bg: #3a1a18;      --color-status-blocked-fg: #ffc2b8;
+
+  --color-tag-bug-bg: #3a1a18;       --color-tag-bug-fg: #ffc2b8;
+  --color-tag-frontend-bg: #13263b;  --color-tag-frontend-fg: #b8dcff;
+  --color-tag-backend-bg: #2a2a12;   --color-tag-backend-fg: #ece79a;
+  --color-tag-design-bg: #2a1c36;    --color-tag-design-fg: #e2c0ff;
+  --color-tag-test-bg: #173420;      --color-tag-test-fg: #b8ffb2;
+  --color-tag-docs-bg: #331a28;      --color-tag-docs-fg: #ffcbe2;
+
+  --color-pri-highest: #ff9f8f;
+  --color-pri-high:    #ffbf88;
+  --color-pri-medium:  #ece79a;
+  --color-pri-low:     #96ff8f;
+  --color-pri-lowest:  #74c6a7;
+
+  --glass-bg: rgba(9, 13, 12, 0.86);
+  --glass-border: rgba(115, 255, 205, 0.20);
+  --scrim: rgba(0, 0, 0, 0.72);
+  --card-highlight: inset 0 1px 0 rgba(130, 255, 213, 0.10);
+  --card-grounding: 0 1px 0 rgba(0, 0, 0, 0.56);
+
+  color-scheme: dark;
+}
+[data-theme="terminal-mono"] body {
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
 }
 
 /* High-contrast light: pure black-on-white with hard borders. Targets
@@ -798,6 +1000,11 @@ input, textarea, select { font-family: inherit; }
     pointer-events: auto;
   }
 }
+@media (max-width: 1023px) {
+  [data-app-shell] > header {
+    padding-inline: 0.5rem;
+  }
+}
 @media (min-width: 768px) {
   .sidebar-overlay { display: none; }
 }
@@ -825,6 +1032,11 @@ input, textarea, select { font-family: inherit; }
 }
 .board-card {
   touch-action: pan-y;
+}
+@media (max-width: 1023px) {
+  .board-column {
+    width: min(72vw, 360px);
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -867,9 +1079,35 @@ input, textarea, select { font-family: inherit; }
       minmax(120px, 1fr)
       32px;
     gap: 0.75rem;
-    min-width: 960px;
+    min-width: 860px;
   }
   .backlog-cell-md { display: revert; }
+}
+
+/* Mobile/tablet action/filter rails: keep controls on one line and allow
+   horizontal scrolling instead of wrapping into cramped multi-line stacks. */
+.touch-toolbar {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  flex-wrap: nowrap;
+}
+.touch-toolbar > * {
+  flex-shrink: 0;
+}
+
+/* Sub-task rows: compact task-focused layout on phones, full matrix on md+. */
+.subtask-row {
+  display: grid;
+  grid-template-columns: 16px 18px minmax(0, 1fr) auto 28px 20px;
+  gap: 0.5rem;
+  align-items: center;
+}
+@media (min-width: 768px) {
+  .subtask-row {
+    grid-template-columns: 16px 18px 100px minmax(0, 1fr) 100px minmax(80px, 140px) 28px 28px;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────

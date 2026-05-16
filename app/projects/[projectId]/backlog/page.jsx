@@ -547,7 +547,7 @@ export default function BacklogPage({ params: paramsPromise }) {
         </div>
       </div>
 
-      <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 py-3 flex items-center gap-2 flex-wrap shrink-0">
+      <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 py-3 flex items-center gap-2 touch-toolbar shrink-0">
         <div className="relative">
           <Icon
             name="search"
@@ -659,7 +659,7 @@ export default function BacklogPage({ params: paramsPromise }) {
             Clear filters
           </button>
         )}
-        <div className="flex-1" />
+        <div className="md:flex-1" />
         {manageVersions.allowed && (
           <button
             type="button"

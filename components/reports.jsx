@@ -1579,7 +1579,7 @@ export function Reports({ sprint, projectId, tasks = [] }) {
 
   return (
     <div className="px-1 sm:px-3 lg:px-6 py-3 sm:py-4">
-      <div className="grid gap-4 max-w-300 mx-auto">
+      <div className="grid gap-4 max-w-[1440px] mx-auto">
         <KpiRow
           projectId={projectId}
           sprint={sprint}
