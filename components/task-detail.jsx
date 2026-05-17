@@ -41,6 +41,7 @@ import { PEOPLE } from "@/lib/data";
 import {
   useActivities,
   useCarryover,
+  useChildren,
   useCustomOptions,
   useAvailableAssignees,
   usePostComment,
@@ -49,6 +50,7 @@ import {
   useWpGithubPullRequests,
   useWpRevisions,
   useWpSchema,
+  useWorkPackage,
 } from "@/lib/hooks/use-openproject-detail";
 import { usePublicConfig } from "@/components/config-provider";
 
@@ -244,7 +246,12 @@ export function TaskDetail({
   onSubtaskBulkDelete,
   onCreateSubtask,
 }) {
-  const task = tasks.find((t) => t.id === taskId);
+  // Prefer the task from context (already has sprint/board data merged in);
+  // fall back to a direct fetch so the modal works even when the WP isn't
+  // in the current page's sprint-scoped list (e.g. deep-linked URL).
+  const taskFromContext = tasks.find((t) => t.id === taskId);
+  const wpQuery = useWorkPackage(taskId, !taskFromContext && !!taskId);
+  const task = taskFromContext ?? wpQuery.data ?? null;
   const wpId = task?.nativeId;
 
   const [tab, setTab] = useState("comments");
@@ -277,6 +284,18 @@ export function TaskDetail({
     defaultValues: { comment: "" },
   });
   const commentText = useWatch({ control, name: "comment" }) || "";
+
+  const childrenQ = useChildren(wpId, !!wpId);
+  // Merge API-fetched children into allTasks so SubtaskBreakdown's child
+  // index is accurate even when the project-wide task list is truncated
+  // by the hard cap (e.g. projects with >1000 work packages).
+  const allTasksWithChildren = (() => {
+    const fetched = childrenQ.data;
+    if (!fetched?.length) return tasks;
+    const taskIds = new Set(tasks.map((t) => String(t.nativeId)));
+    const missing = fetched.filter((c) => !taskIds.has(String(c.nativeId)));
+    return missing.length ? [...tasks, ...missing] : tasks;
+  })();
 
   const activities = useActivities(wpId);
   // Counts fetched here drive the Development tab labels; TanStack dedupes
@@ -327,7 +346,10 @@ export function TaskDetail({
     setDescVal(task.descriptionHtml || task.description || "");
   }
 
-  if (!task) return null;
+  if (!task) {
+    if (wpQuery.isLoading) return <div className="p-8 text-fg-subtle text-sm">Loading…</div>;
+    return null;
+  }
 
   const reporter = task.reporter
     ? (Array.isArray(assignees) ? assignees : []).find(
@@ -730,7 +752,7 @@ export function TaskDetail({
               types={types}
               canCreate={canEdit}
               currentUserId={currentUser?.id}
-              allTasks={tasks}
+              allTasks={allTasksWithChildren}
               onUpdate={onUpdate}
               onChange={onChange}
               onTaskClick={onSelectTask}
