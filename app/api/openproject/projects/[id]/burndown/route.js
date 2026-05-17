@@ -68,6 +68,7 @@ async function computeBurndown(projectId, sprintId) {
     fetchAllPages(
       `/projects/${encodeURIComponent(projectId)}/work_packages`,
       { filters },
+      { hardCap: Infinity },
     ),
   ]);
   const allVersions = elementsOf(versionsHal).map(mapVersionFull);
@@ -100,6 +101,7 @@ async function computeBurndown(projectId, sprintId) {
     const baselineEls = await fetchAllPages(
       `/projects/${encodeURIComponent(projectId)}/work_packages`,
       { filters, timestamps: baselineTs },
+      { hardCap: Infinity },
     );
     baselineWps = baselineEls.map((wp) => mapWorkPackage(wp, lookups));
   } catch {
@@ -135,6 +137,7 @@ async function computeBurndown(projectId, sprintId) {
             { version: { operator: "=", values: otherVersionIds } },
           ]),
         },
+        { hardCap: Infinity },
       );
       otherWps = otherEls
         .map((wp) => mapWorkPackage(wp, lookups))
