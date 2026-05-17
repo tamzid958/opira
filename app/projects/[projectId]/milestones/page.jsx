@@ -6,6 +6,7 @@ import { LoadingPill } from "@/components/ui/loading-pill";
 import { useApiStatus, useSprints, useTasks } from "@/lib/hooks/use-openproject";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 
 export default function MilestonesPage({ params: paramsPromise }) {
   const { projectId } = use(paramsPromise);
@@ -15,6 +16,9 @@ export default function MilestonesPage({ params: paramsPromise }) {
   const configured = status.data?.configured === true;
   const tasksQ = useTasks(projectId, null, configured && !!projectId);
   const sprintsQ = useSprints(projectId, configured && !!projectId);
+
+  const tasks = tasksQ.data || [];
+  useSetPageTasks(tasks);
 
   const { ready: pageReady, error: pageError } = useQueriesSettled(tasksQ, sprintsQ);
 
@@ -34,7 +38,7 @@ export default function MilestonesPage({ params: paramsPromise }) {
           <div className="p-6 text-pri-highest">{String(pageError.message)}</div>
         ) : (
           <Milestones
-            tasks={tasksQ.data || []}
+            tasks={tasks}
             sprints={sprintsQ.data || []}
             onTaskClick={(id) => setParams({ wp: id })}
           />

@@ -13,6 +13,7 @@ import {
 import { useMe } from "@/lib/hooks/use-openproject-detail";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 import { pickSprintByDate } from "@/lib/hooks/use-active-sprint";
 
 export default function OverviewPage({ params: paramsPromise }) {
@@ -30,6 +31,8 @@ export default function OverviewPage({ params: paramsPromise }) {
 
   const project = projectsQ.data?.find((p) => p.id === projectId) || null;
   const activeSprint = pickSprintByDate(sprintsQ.data || []);
+  const tasks = tasksQ.data || [];
+  useSetPageTasks(tasks);
 
   // Wait for projects + tasks + sprints + me before rendering: the
   // dashboard hero, active-sprint band, and "your work" rail all read
@@ -56,7 +59,7 @@ export default function OverviewPage({ params: paramsPromise }) {
           project={project}
           activeSprint={activeSprint}
           sprints={sprintsQ.data || []}
-          tasks={tasksQ.data || []}
+          tasks={tasks}
           activeTab={activeTab}
           onTabChange={(tab) => setParams({ tab })}
           onTaskClick={(id) => setParams({ wp: id })}

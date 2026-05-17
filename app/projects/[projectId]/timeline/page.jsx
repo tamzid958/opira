@@ -11,6 +11,7 @@ import {
 import { useAvailableAssignees } from "@/lib/hooks/use-openproject-detail";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 
 export default function TimelinePage({ params: paramsPromise }) {
   const { projectId } = use(paramsPromise);
@@ -25,6 +26,9 @@ export default function TimelinePage({ params: paramsPromise }) {
   // Sprints overlay drives the lane background and assignees populate the
   // row avatars — wait for both before painting so the chart doesn't
   // re-layout once they arrive.
+  const tasks = tasksQ.data || [];
+  useSetPageTasks(tasks);
+
   const { ready: pageReady, error: pageError } = useQueriesSettled(
     tasksQ,
     sprintsQ,
@@ -47,7 +51,7 @@ export default function TimelinePage({ params: paramsPromise }) {
           <div className="p-6 text-pri-highest">{String(pageError.message)}</div>
         ) : (
           <Timeline
-            tasks={tasksQ.data || []}
+            tasks={tasks}
             sprints={sprintsQ.data || []}
             assignees={assigneesQ.data || []}
             isLoading={false}

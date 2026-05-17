@@ -13,6 +13,7 @@ import {
 } from "@/lib/hooks/use-openproject";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 import { pickSprintByDate } from "@/lib/hooks/use-active-sprint";
 
 export default function ReportsPage({ params: paramsPromise }) {
@@ -35,6 +36,7 @@ export default function ReportsPage({ params: paramsPromise }) {
   })();
 
   const allTasks = tasksQ.data || [];
+  useSetPageTasks(allTasks);
 
   const [sprintMenu, setSprintMenu] = useState(null);
 

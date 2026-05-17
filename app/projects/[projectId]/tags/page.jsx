@@ -6,6 +6,7 @@ import { Tags } from "@/components/tags";
 import { LoadingPill } from "@/components/ui/loading-pill";
 import { useApiStatus, useProjects, useTasks } from "@/lib/hooks/use-openproject";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 
 export default function TagsPage({ params: paramsPromise }) {
   const { projectId } = use(paramsPromise);
@@ -16,6 +17,8 @@ export default function TagsPage({ params: paramsPromise }) {
   const projectsQ = useProjects(configured);
   const tasksQ = useTasks(projectId, null, configured && !!projectId);
   const project = projectsQ.data?.find((p) => p.id === projectId) || null;
+  const tasks = tasksQ.data || [];
+  useSetPageTasks(tasks);
 
   const { ready: pageReady, error: pageError } = useQueriesSettled(
     tasksQ,
@@ -40,7 +43,7 @@ export default function TagsPage({ params: paramsPromise }) {
           <Tags
             projectId={projectId}
             projectName={project?.name}
-            tasks={tasksQ.data || []}
+            tasks={tasks}
             onFilter={(name) =>
               router.push(
                 `/projects/${projectId}/backlog?label=${encodeURIComponent(name)}`,

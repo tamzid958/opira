@@ -43,6 +43,7 @@ import {
 import { useEstimateMode } from "@/lib/hooks/use-estimate-mode";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 import { fetchJson, friendlyError } from "@/lib/api-client";
 import { findById } from "@/lib/utils";
 
@@ -93,6 +94,7 @@ export default function BacklogPage({ params: paramsPromise }) {
   const manageVersions = usePermissionWithLoading(projectId, PERM.MANAGE_VERSIONS);
 
   const tasks = tasksQ.data || [];
+  useSetPageTasks(tasks);
   const sprintsList = sprintsQ.data || [];
   const statuses = statusesQ.data || [];
   const closedStatusIds = buildClosedStatusIdSet(statuses);
