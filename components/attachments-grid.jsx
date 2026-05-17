@@ -38,7 +38,7 @@ export function getTileStyle(contentType) {
   if (ARCHIVE_TYPES.has(ct)) return { icon: "archive", bg: "bg-purple-100 text-purple-700" };
   if (ct.startsWith("text/") || CODE_TYPES.has(ct))
     return { icon: "code", bg: "bg-slate-100 text-slate-700" };
-  if (ct.startsWith("application/vnd.") || ct === "application/msword" || ct === "application/ms-excel" || ct === "application/ms-powerpoint")
+  if (ct.startsWith("application/vnd.") || ct === "application/msword")
     return { icon: "file", bg: "bg-blue-100 text-blue-700" };
   return { icon: "paperclip", bg: "bg-amber-100 text-amber-700" };
 }

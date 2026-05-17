@@ -44,6 +44,9 @@ export function AttachmentLightbox({ items, initialIndex, onClose }) {
     <div
       className="fixed inset-0 z-50 flex flex-col bg-black/85"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Attachment preview"
     >
       {/* Header */}
       <div
@@ -61,6 +64,7 @@ export function AttachmentLightbox({ items, initialIndex, onClose }) {
         </div>
         <button
           type="button"
+          autoFocus
           onClick={onClose}
           className="p-2 rounded hover:bg-white/10 transition-colors"
           aria-label="Close"
