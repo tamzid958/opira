@@ -52,6 +52,7 @@ The tile `<a>` element is replaced with a `<button>` that calls `setLightboxInde
 **Body (content area):**
 - **Images**: `<img src={item.downloadUrl}>` centered, `max-h-[85vh] max-w-[90vw] object-contain`.
 - **PDFs**: `<iframe src={item.downloadUrl} className="w-full h-[85vh]">`.
+- **Videos**: `<video src={item.downloadUrl} controls className="max-h-[85vh] max-w-[90vw]" />`.
 - **All others**: centered message "No preview available" + an `<a download href={item.downloadUrl}>` download button.
 
 **Navigation:** Left/right arrow buttons shown when `items.length > 1`. Arrows are absolutely positioned over the body area.
