@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useChildren } from "@/lib/hooks/use-openproject-detail";
 import { ChevronRight, Flag } from "lucide-react";
 import { TaskTypeIcon, TaskStatusPill } from "@/components/ui/task-meta";
 import { Avatar } from "@/components/ui/avatar";
@@ -105,9 +106,11 @@ function ChildRow({ task, sprints, onClick }) {
 
 // ─── Milestone (parent) row ───────────────────────────────────────
 
-function MilestoneRow({ milestone, childTasks, sprints, onTaskClick }) {
+function MilestoneRow({ milestone, sprints, onTaskClick }) {
   const [open, setOpen] = useState(true);
   const { aiEnabled } = usePublicConfig();
+  const childrenQ = useChildren(milestone.nativeId);
+  const childTasks = childrenQ.data || [];
   const sprint = sprintName(milestone, sprints);
   const childCount = childTasks.length;
   const closedCount = childTasks.filter((c) => c.statusIsClosed).length;
@@ -261,9 +264,11 @@ function MobileChildCard({ task, sprints, onClick }) {
   );
 }
 
-function MobileMilestoneCard({ milestone, childTasks, sprints, onTaskClick }) {
+function MobileMilestoneCard({ milestone, sprints, onTaskClick }) {
   const [open, setOpen] = useState(true);
   const { aiEnabled } = usePublicConfig();
+  const childrenQ = useChildren(milestone.nativeId);
+  const childTasks = childrenQ.data || [];
   const sprint = sprintName(milestone, sprints);
   const childCount = childTasks.length;
   const closedCount = childTasks.filter((c) => c.statusIsClosed).length;
@@ -358,19 +363,10 @@ function MobileMilestoneCard({ milestone, childTasks, sprints, onTaskClick }) {
 // ─── Main component ───────────────────────────────────────────────
 
 export function Milestones({ tasks, sprints, onTaskClick }) {
-  // Parents = no parent WP themselves (epic === null / undefined)
+  // Parents = no parent WP themselves (epic === null / undefined).
+  // Each MilestoneRow fetches its own children via useChildren.
   const parents = tasks.filter((t) => !t.epic);
-  // Children = tasks that reference a parent
-  const childMap = new Map();
-  for (const t of tasks) {
-    if (t.epic) {
-      const key = String(t.epic);
-      if (!childMap.has(key)) childMap.set(key, []);
-      childMap.get(key).push(t);
-    }
-  }
 
-  // Milestones are parents that either have children already, or any top-level WP.
   // Sort: open first, then by dueDate ascending (nulls last).
   const sorted = [...parents].sort((a, b) => {
     if (a.statusIsClosed !== b.statusIsClosed)
@@ -398,7 +394,6 @@ export function Milestones({ tasks, sprints, onTaskClick }) {
           <MobileMilestoneCard
             key={milestone.id}
             milestone={milestone}
-            childTasks={childMap.get(String(milestone.nativeId)) || []}
             sprints={sprints}
             onTaskClick={onTaskClick}
           />
@@ -437,7 +432,6 @@ export function Milestones({ tasks, sprints, onTaskClick }) {
               <MilestoneRow
                 key={milestone.id}
                 milestone={milestone}
-                childTasks={childMap.get(String(milestone.nativeId)) || []}
                 sprints={sprints}
                 onTaskClick={onTaskClick}
               />
