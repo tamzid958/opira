@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: false,
-    include: ["lib/**/*.test.js", "lib/**/*.test.jsx"],
+    include: ["lib/**/*.test.js", "lib/**/*.test.jsx", "components/**/*.test.js", "components/**/*.test.jsx"],
     exclude: ["node_modules", ".next"],
   },
   resolve: {
@@ -16,5 +16,6 @@ export default defineConfig({
       // to a noop.
       "server-only": path.resolve(__dirname, "lib/data/__test_helpers__/server-only-noop.js"),
     },
+    extensions: [".jsx", ".js", ".json"],
   },
 });

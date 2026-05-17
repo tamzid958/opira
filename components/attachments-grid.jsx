@@ -14,6 +14,34 @@ import {
   useUploadAttachment,
 } from "@/lib/hooks/use-openproject-detail";
 
+const ARCHIVE_TYPES = new Set([
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-tar",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+  "application/gzip",
+]);
+
+const CODE_TYPES = new Set([
+  "application/json",
+  "application/xml",
+  "application/javascript",
+]);
+
+export function getTileStyle(contentType) {
+  const ct = contentType || "";
+  if (ct.startsWith("image/")) return { icon: "image", bg: null };
+  if (ct === "application/pdf") return { icon: "file-text", bg: "bg-red-100 text-red-600" };
+  if (ct.startsWith("video/")) return { icon: "play", bg: "bg-slate-800 text-white" };
+  if (ARCHIVE_TYPES.has(ct)) return { icon: "archive", bg: "bg-purple-100 text-purple-700" };
+  if (ct.startsWith("text/") || CODE_TYPES.has(ct))
+    return { icon: "code", bg: "bg-slate-100 text-slate-700" };
+  if (ct.startsWith("application/vnd.") || ct === "application/msword" || ct === "application/ms-excel" || ct === "application/ms-powerpoint")
+    return { icon: "file", bg: "bg-blue-100 text-blue-700" };
+  return { icon: "paperclip", bg: "bg-amber-100 text-amber-700" };
+}
+
 function formatBytes(n) {
   if (n == null) return "—";
   if (n < 1024) return `${n} B`;
