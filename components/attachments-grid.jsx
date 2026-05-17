@@ -8,6 +8,7 @@ import { Icon } from "@/components/icons";
 import { Dropzone } from "@/components/ui/dropzone";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { LoadingPill } from "@/components/ui/loading-pill";
+import { AttachmentLightbox } from "@/components/ui/attachment-lightbox";
 import {
   useAttachments,
   useDeleteAttachment,
@@ -54,6 +55,7 @@ export function AttachmentsGrid({ wpId, canAdd = true }) {
   const upload = useUploadAttachment(wpId);
   const del = useDeleteAttachment(wpId);
   const [confirmId, setConfirmId] = useState(null);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
 
   const handleFiles = async (files) => {
     for (const file of files) {
@@ -83,23 +85,48 @@ export function AttachmentsGrid({ wpId, canAdd = true }) {
 
       {!att.isLoading && items.length > 0 && (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
-          {items.map((a) => (
+          {items.map((a, idx) => (
             <div
               key={a.id}
               className="border border-border rounded-md p-2 bg-surface-elevated text-xs flex flex-col gap-1"
             >
-              <a
-                href={a.downloadUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="grid place-items-center h-17 rounded text-white bg-linear-to-br from-[#fbbf24] to-[#f59e0b] no-underline"
-              >
-                <Icon
-                  name={a.contentType?.startsWith("image/") ? "image" : "paperclip"}
-                  size={20}
-                  aria-hidden="true"
-                />
-              </a>
+              {(() => {
+                const { icon, bg } = getTileStyle(a.contentType);
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIndex(idx)}
+                    aria-label={`Preview ${a.fileName}`}
+                    className={[
+                      "grid place-items-center h-17 rounded w-full overflow-hidden cursor-pointer border-0 p-0",
+                      bg ?? "bg-linear-to-br from-[#fbbf24] to-[#f59e0b]",
+                    ].join(" ")}
+                  >
+                    {icon === "image" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={a.downloadUrl}
+                        alt={a.fileName}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.nextSibling.style.display = "grid";
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      className={[
+                        "grid place-items-center w-full h-full text-current",
+                        icon === "image" ? "hidden" : "",
+                      ].join(" ")}
+                      aria-hidden="true"
+                    >
+                      <Icon name={icon} size={20} />
+                    </span>
+                  </button>
+                );
+              })()}
               <div className="font-medium text-fg truncate" title={a.fileName}>
                 {a.fileName}
               </div>
@@ -149,6 +176,14 @@ export function AttachmentsGrid({ wpId, canAdd = true }) {
             }
             setConfirmId(null);
           }}
+        />
+      )}
+
+      {lightboxIndex !== null && (
+        <AttachmentLightbox
+          items={items}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
         />
       )}
     </section>
