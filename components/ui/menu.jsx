@@ -17,6 +17,7 @@ export function Menu({
   maxHeight,
   searchable = false,
   searchPlaceholder = "Search…",
+  onSearchChange,
 }) {
   const ref = useRef(null);
   const mounted = useIsClient();
@@ -104,14 +105,17 @@ export function Menu({
           <input
             autoFocus
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              onSearchChange?.(e.target.value);
+            }}
             placeholder={searchPlaceholder}
             className="flex-1 bg-transparent border-0 outline-none text-[13px] text-fg placeholder:text-fg-faint min-w-0"
           />
           {query && (
             <button
               type="button"
-              onClick={() => setQuery("")}
+              onClick={() => { setQuery(""); onSearchChange?.(""); }}
               className="text-fg-subtle hover:text-fg shrink-0"
               aria-label="Clear search"
             >

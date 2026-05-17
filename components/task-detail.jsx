@@ -776,6 +776,7 @@ export function TaskDetail({
               allTasks={tasks}
               onTaskClick={onSelectTask}
               onChange={onChange}
+              projectId={projectId}
             />
           </section>
 

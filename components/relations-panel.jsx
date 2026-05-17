@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
 import { Icon } from "@/components/icons";
@@ -60,6 +60,7 @@ export function RelationsPanel({
   allTasks = [],
   onTaskClick,
   onChange,
+  projectId,
 }) {
   const relationsQ = useRelations(wpId);
   const create = useCreateRelation(wpId);
@@ -82,17 +83,45 @@ export function RelationsPanel({
   const [typeMenu, setTypeMenu] = useState(null);
   const [targetMenu, setTargetMenu] = useState(null);
 
+  const [wpSearchResults, setWpSearchResults] = useState([]);
+  const [wpSearchLoading, setWpSearchLoading] = useState(false);
+  const wpSearchDebounce = useRef(null);
+
+  const searchWps = (q) => {
+    clearTimeout(wpSearchDebounce.current);
+    if (!q || q.trim().length < 1) {
+      setWpSearchResults([]);
+      return;
+    }
+    setWpSearchLoading(true);
+    // Capture the current prop values at call time so the async callback
+    // below always uses the values that were current when the user typed,
+    // even if the component re-renders before the timer fires.
+    const currentProjectId = projectId;
+    const currentWpId = wpId;
+    wpSearchDebounce.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ q: q.trim() });
+        if (currentProjectId) params.set("project", currentProjectId);
+        if (currentWpId) params.set("exclude", String(currentWpId));
+        const res = await fetch(`/api/openproject/tasks/parent-search?${params}`);
+        const data = await res.json();
+        setWpSearchResults(Array.isArray(data) ? data : []);
+      } catch {
+        setWpSearchResults([]);
+      } finally {
+        setWpSearchLoading(false);
+      }
+    }, 300);
+  };
+
+  useEffect(() => () => clearTimeout(wpSearchDebounce.current), []);
+
   const relatedNativeIds = new Set(
     relations.map((r) => String(r.otherId)).filter(Boolean),
   );
-  const targetItems = (allTasks || [])
-    .filter(
-      (t) =>
-        t &&
-        t.id !== selfTaskId &&
-        t.nativeId != null &&
-        !relatedNativeIds.has(String(t.nativeId)),
-    )
+  const targetItems = wpSearchResults
+    .filter((t) => t?.nativeId != null && !relatedNativeIds.has(String(t.nativeId)))
     .map((t) => ({
       label: `${t.key} · ${t.title}`,
       value: String(t.nativeId),
@@ -298,17 +327,20 @@ export function RelationsPanel({
       {targetMenu && (
         <Menu
           anchorRect={targetMenu}
-          onClose={() => setTargetMenu(null)}
+          onClose={() => { setTargetMenu(null); setWpSearchResults([]); }}
           onSelect={(it) => onPickTarget(it.value)}
-          width={320}
-          maxHeight={300}
+          items={
+            wpSearchLoading
+              ? [{ label: "Searching…", value: null, disabled: true }]
+              : targetItems.length > 0
+              ? targetItems
+              : [{ label: "Type to search work packages…", value: null, disabled: true }]
+          }
           searchable
           searchPlaceholder="Search work packages…"
-          items={
-            targetItems.length > 0
-              ? targetItems
-              : [{ label: "No matching work packages", value: null, disabled: true }]
-          }
+          onSearchChange={(q) => searchWps(q)}
+          width={320}
+          maxHeight={300}
         />
       )}
     </section>
