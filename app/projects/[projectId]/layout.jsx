@@ -22,11 +22,11 @@ import {
   useProjects,
   useSprints,
   useStatuses,
-  useTasks,
   useTypes,
   useUpdateTask,
   useUsers,
 } from "@/lib/hooks/use-openproject";
+import { TasksProvider, usePageTasks } from "@/lib/contexts/tasks-context";
 import { runBatched } from "@/lib/openproject/resolve-patch";
 import {
   useAvailableAssignees,
@@ -69,7 +69,6 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
     null;
   const createDefaultParent = urlParams.get("createParent") || null;
   const createDefaultParentName = urlParams.get("createParentName") || null;
-  const tasksQ = useTasks(projectId, configured && !!projectId);
   const statusesQ = useStatuses(configured);
   const typesQ = useTypes(projectId, configured && !!projectId);
   const prioritiesQ = usePriorities(configured);
@@ -105,7 +104,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
 
   const project = projectsQ.data?.find((p) => p.id === projectId) || null;
   const sprintsList = sprintsQ.data || [];
-  const tasks = tasksQ.data || [];
+  const tasks = usePageTasks();
   // Epics surface from the OpenProject hierarchy: any work package that
   // has children and isn't itself a child. Type names play no role.
   const epicsList = tasks
@@ -134,7 +133,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
   // expects a single { id, patch } object — wrap it to bridge the shapes.
   const subtaskUpdateAsync = useCallback(
     (id, patch) => updateTaskMutation.mutateAsync({ id, patch }),
-    [updateTaskMutation.mutateAsync],
+    [updateTaskMutation],
   );
 
   const subtaskBulkMoveSprint = useCallback(async (ids, sprintId) => {
@@ -329,6 +328,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
   }
 
   return (
+    <TasksProvider>
     <div
       data-app-shell
       className="grid grid-cols-[216px_minmax(0,1fr)] lg:grid-cols-[224px_minmax(0,1fr)] grid-rows-[48px_minmax(0,1fr)] h-dvh w-full max-w-full overflow-hidden"
@@ -394,6 +394,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
           onCreate={createIssue}
           projectName={project?.name}
           projectId={projectId}
+          numericProjectId={project?.nativeId || null}
           defaultSprint={createDefaultSprint}
           defaultStatus={createDefaultStatus}
           defaultParent={createDefaultParent}
@@ -415,5 +416,6 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
         onSwitchProject={(id) => router.push(`/projects/${id}/board`)}
       />
     </div>
+    </TasksProvider>
   );
 }

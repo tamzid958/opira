@@ -10,6 +10,8 @@ import {
   elementsOf,
   mapMembership,
 } from "@/lib/openproject/mappers";
+import { invalidateViewerPermissions } from "@/lib/openproject/permissions";
+import { clearAssigneesLocalCache } from "@/lib/openproject/ephemeral-caches";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +69,8 @@ export async function POST(req, ctx) {
       method: "POST",
       body: JSON.stringify(body),
     });
+    clearAssigneesLocalCache();
+    void invalidateViewerPermissions(data.principalId ? String(data.principalId) : null);
     return Response.json(mapMembership(created));
   } catch (e) {
     return errorResponse(e);

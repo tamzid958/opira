@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Icon } from "@/components/icons";
+import { Icon, TypeIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 const MIN_CHARS = 2;
@@ -222,6 +222,7 @@ function ParentPickerDropdown({
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
+            <TypeIcon name={r.typeName} color={null} size={13} />
             <span className="font-mono text-[11px] text-fg-subtle shrink-0">#{r.id}</span>
             <span className="flex-1 truncate">{r.title}</span>
             {String(r.id) === String(value) && (

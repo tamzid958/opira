@@ -3,9 +3,10 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { Tags } from "@/components/tags";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useApiStatus, useProjects, useTasks } from "@/lib/hooks/use-openproject";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 
 export default function TagsPage({ params: paramsPromise }) {
   const { projectId } = use(paramsPromise);
@@ -16,11 +17,15 @@ export default function TagsPage({ params: paramsPromise }) {
   const projectsQ = useProjects(configured);
   const tasksQ = useTasks(projectId, null, configured && !!projectId);
   const project = projectsQ.data?.find((p) => p.id === projectId) || null;
+  const tasks = tasksQ.data || [];
+  useSetPageTasks(tasks);
 
   const { ready: pageReady, error: pageError } = useQueriesSettled(
     tasksQ,
     projectsQ,
   );
+
+  if (!pageReady) return <PageSkeleton title="Tags" />;
 
   return (
     <>
@@ -30,17 +35,13 @@ export default function TagsPage({ params: paramsPromise }) {
         </h1>
       </div>
       <div className="flex-1 px-3 sm:px-6 py-3 sm:py-4 overflow-auto">
-        {!pageReady ? (
-          <div className="grid place-items-center min-h-[40vh]">
-            <LoadingPill label="loading tags" />
-          </div>
-        ) : pageError ? (
+        {pageError ? (
           <div className="p-6 text-pri-highest">{String(pageError.message)}</div>
         ) : (
           <Tags
             projectId={projectId}
             projectName={project?.name}
-            tasks={tasksQ.data || []}
+            tasks={tasks}
             onFilter={(name) =>
               router.push(
                 `/projects/${projectId}/backlog?label=${encodeURIComponent(name)}`,

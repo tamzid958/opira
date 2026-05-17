@@ -1,5 +1,5 @@
-import { buildFilters, opFetch, withQuery } from "@/lib/openproject/client";
-import { buildCreateBody, elementsOf, mapWorkPackage } from "@/lib/openproject/mappers";
+import { buildFilters, fetchAllPages, opFetch } from "@/lib/openproject/client";
+import { buildCreateBody, mapWorkPackage } from "@/lib/openproject/mappers";
 import { errorResponse, nativeId } from "@/lib/openproject/route-utils";
 
 export const dynamic = "force-dynamic";
@@ -8,13 +8,13 @@ export const dynamic = "force-dynamic";
 export async function GET(_req, ctx) {
   try {
     const { id } = await ctx.params;
-    const path = withQuery("/work_packages", {
-      pageSize: "200",
-      filters: buildFilters([{ parent: { operator: "=", values: [nativeId(id)] } }]),
-      sortBy: JSON.stringify([["createdAt", "asc"]]),
-    });
-    const hal = await opFetch(path);
-    const tasks = elementsOf(hal).map((wp) => mapWorkPackage(wp));
+    const filters = buildFilters([{ parent: { operator: "=", values: [nativeId(id)] } }]);
+    const els = await fetchAllPages(
+      "/work_packages",
+      { filters, sortBy: JSON.stringify([["createdAt", "asc"]]) },
+      { hardCap: Infinity },
+    );
+    const tasks = els.map((wp) => mapWorkPackage(wp));
     return Response.json(tasks);
   } catch (e) {
     return errorResponse(e);

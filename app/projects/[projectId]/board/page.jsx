@@ -9,7 +9,7 @@ import { BoardTriageLane } from "@/components/board-triage-lane";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Icon } from "@/components/icons";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { Menu } from "@/components/ui/menu";
 import {
   useAvailableAssignees,
@@ -31,6 +31,7 @@ import {
 import { resolveApiPatch } from "@/lib/openproject/resolve-patch";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 import { useSavedViews } from "@/lib/hooks/use-saved-views";
 import { pickSprintByDate } from "@/lib/hooks/use-active-sprint";
 import { friendlyError } from "@/lib/api-client";
@@ -242,6 +243,7 @@ export default function BoardPage({ params: paramsPromise }) {
     sprintFilter === "all" ? null : sprintFilter === "backlog" ? "backlog" : sprintFilter;
   const tasksQ = useTasks(projectId, sprintScope, configured && !!projectId);
   const tasks = useMemo(() => tasksQ.data || [], [tasksQ.data]);
+  useSetPageTasks(tasks);
   const estimateModeQ = useEstimateMode(projectId);
   const inferredMode = useMemo(() => inferModeFromTasks(tasks) || "numeric", [tasks]);
   const estimateMode = estimateModeQ.isLoading ? inferredMode : estimateModeQ.mode || "numeric";
@@ -412,46 +414,6 @@ export default function BoardPage({ params: paramsPromise }) {
     }
   };
 
-  // Inline column create: minimum-viable issue from a single title input.
-  // Pulls defaults from the active sprint + the column's status; type and
-  // priority fall back to the project's default buckets so the user only
-  // has to type the title. Returns a Promise so the inline form can clear
-  // / re-focus once the create lands.
-  const onInlineCreate = (statusId, title) =>
-    new Promise((resolve, reject) => {
-      const target = (statusesQ.data || []).find(
-        (s) => String(s.id) === String(statusId),
-      );
-      // Pick the OpenProject-configured default type and priority. The API
-      // exposes `isDefault` on both resources — that's the truth.
-      const defaultType = (typesQ.data || []).find((t) => t.isDefault);
-      const defaultPriority = (prioritiesQ.data || []).find((p) => p.isDefault);
-      createTaskMutation.mutate(
-        {
-          projectId,
-          title,
-          description: "",
-          typeId: defaultType?.id || (typesQ.data || [])[0]?.id || null,
-          statusId,
-          priorityId: defaultPriority?.id || null,
-          assignee: null,
-          sprint: activeSprint?.id || null,
-        },
-        {
-          onSuccess: (created) => {
-            toast.success(
-              `Created ${created?.key || "issue"} in ${target?.name || "column"}`,
-            );
-            resolve(created);
-          },
-          onError: (err) => {
-            toast.error(friendlyError(err, "Couldn't create issue"));
-            reject(err);
-          },
-        },
-      );
-    });
-
   // ── Filter-bar metadata ────────────────────────────────────────────────
 
   const chipMeta = (kind) => {
@@ -513,20 +475,7 @@ export default function BoardPage({ params: paramsPromise }) {
   // While loading, render a stable shell — generic title, no chips, no
   // sprint selector — so nothing in the chrome morphs from placeholder to
   // real value as queries land.
-  if (!pageReady) {
-    return (
-      <>
-        <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 pt-3.5 pb-3 shrink-0">
-          <h1 className="font-display text-[24px] font-semibold tracking-[-0.022em] text-fg m-0">
-            Board
-          </h1>
-        </div>
-        <div className="flex-1 grid place-items-center">
-          <LoadingPill label="loading board" />
-        </div>
-      </>
-    );
-  }
+  if (!pageReady) return <PageSkeleton title="Board" />;
 
   if (pageError) {
     return (
@@ -983,7 +932,6 @@ export default function BoardPage({ params: paramsPromise }) {
             }
             onTaskClick={(id) => setParams({ wp: id })}
             onMoveTask={moveTaskByStatusId}
-            onInlineCreate={onInlineCreate}
             onBulkUpdate={onBulkUpdate}
             onBulkDelete={onBulkDelete}
             onCreateInColumn={(statusId) => {

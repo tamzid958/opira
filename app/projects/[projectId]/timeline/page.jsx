@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import { Timeline } from "@/components/timeline";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import {
   useApiStatus,
   useSprints,
@@ -11,6 +11,7 @@ import {
 import { useAvailableAssignees } from "@/lib/hooks/use-openproject-detail";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 
 export default function TimelinePage({ params: paramsPromise }) {
   const { projectId } = use(paramsPromise);
@@ -22,14 +23,16 @@ export default function TimelinePage({ params: paramsPromise }) {
   const sprintsQ = useSprints(projectId, configured && !!projectId);
   const assigneesQ = useAvailableAssignees(projectId, configured && !!projectId);
 
-  // Sprints overlay drives the lane background and assignees populate the
-  // row avatars — wait for both before painting so the chart doesn't
-  // re-layout once they arrive.
+  const tasks = tasksQ.data || [];
+  useSetPageTasks(tasks);
+
   const { ready: pageReady, error: pageError } = useQueriesSettled(
     tasksQ,
     sprintsQ,
     assigneesQ,
   );
+
+  if (!pageReady) return <PageSkeleton title="Timeline" />;
 
   return (
     <>
@@ -39,18 +42,13 @@ export default function TimelinePage({ params: paramsPromise }) {
         </h1>
       </div>
       <div className="flex-1 px-3 sm:px-6 py-3 sm:py-4 overflow-auto">
-        {!pageReady ? (
-          <div className="grid place-items-center min-h-[40vh]">
-            <LoadingPill label="loading timeline" />
-          </div>
-        ) : pageError ? (
+        {pageError ? (
           <div className="p-6 text-pri-highest">{String(pageError.message)}</div>
         ) : (
           <Timeline
-            tasks={tasksQ.data || []}
+            tasks={tasks}
             sprints={sprintsQ.data || []}
             assignees={assigneesQ.data || []}
-            isLoading={false}
             onTaskClick={(id) => setParams({ wp: id })}
           />
         )}

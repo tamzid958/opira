@@ -9,7 +9,7 @@ import { SprintModal } from "@/components/sprint-modal";
 import { CompleteSprintModal } from "@/components/complete-sprint-modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Icon } from "@/components/icons";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { Menu } from "@/components/ui/menu";
 import {
   useApiStatus,
@@ -43,6 +43,7 @@ import {
 import { useEstimateMode } from "@/lib/hooks/use-estimate-mode";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 import { fetchJson, friendlyError } from "@/lib/api-client";
 import { findById } from "@/lib/utils";
 
@@ -93,6 +94,7 @@ export default function BacklogPage({ params: paramsPromise }) {
   const manageVersions = usePermissionWithLoading(projectId, PERM.MANAGE_VERSIONS);
 
   const tasks = tasksQ.data || [];
+  useSetPageTasks(tasks);
   const sprintsList = sprintsQ.data || [];
   const statuses = statusesQ.data || [];
   const closedStatusIds = buildClosedStatusIdSet(statuses);
@@ -507,20 +509,7 @@ export default function BacklogPage({ params: paramsPromise }) {
     (k) => filters[k] === "all" || !filters[k],
   );
 
-  if (!pageReady) {
-    return (
-      <>
-        <div className="bg-surface-elevated border-b border-border-soft px-3 sm:px-6 pt-3.5 pb-3 shrink-0">
-          <h1 className="font-display text-[24px] font-semibold tracking-[-0.022em] text-fg m-0">
-            Backlog
-          </h1>
-        </div>
-        <div className="flex-1 grid place-items-center">
-          <LoadingPill label="loading backlog" />
-        </div>
-      </>
-    );
-  }
+  if (!pageReady) return <PageSkeleton title="Backlog" />;
 
   if (pageError) {
     return (

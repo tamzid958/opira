@@ -34,6 +34,7 @@ export async function GET(req) {
         title: wp.subject || "",
         epicName: linkTitle(wp._links?.parent) || null,
         parentId: idFromHref(wp._links?.parent?.href) || null,
+        typeName: linkTitle(wp._links?.type) || null,
       }));
 
     return Response.json(results);

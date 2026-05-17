@@ -68,6 +68,7 @@ async function computeCapacity(projectId, sprintId) {
     fetchAllPages(
       `/projects/${encodeURIComponent(projectId)}/work_packages`,
       { filters: sprintFilter },
+      { hardCap: Infinity },
     ),
     loadLookups(projectId),
   ]);

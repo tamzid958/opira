@@ -1,12 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/api-client";
 import { Icon } from "@/components/icons";
 import { TaskStatusPill, TaskTypeIcon } from "@/components/ui/task-meta";
 import { Menu } from "@/components/ui/menu";
-import { LoadingPill } from "@/components/ui/loading-pill";
 import { OUTGOING_RELATION_TYPES, RELATION_LABELS } from "@/lib/openproject/mappers";
 import {
   useCreateRelation,
@@ -60,6 +59,7 @@ export function RelationsPanel({
   allTasks = [],
   onTaskClick,
   onChange,
+  projectId,
 }) {
   const relationsQ = useRelations(wpId);
   const create = useCreateRelation(wpId);
@@ -82,17 +82,45 @@ export function RelationsPanel({
   const [typeMenu, setTypeMenu] = useState(null);
   const [targetMenu, setTargetMenu] = useState(null);
 
+  const [wpSearchResults, setWpSearchResults] = useState([]);
+  const [wpSearchLoading, setWpSearchLoading] = useState(false);
+  const wpSearchDebounce = useRef(null);
+
+  const searchWps = (q) => {
+    clearTimeout(wpSearchDebounce.current);
+    if (!q || q.trim().length < 1) {
+      setWpSearchResults([]);
+      return;
+    }
+    setWpSearchLoading(true);
+    // Capture the current prop values at call time so the async callback
+    // below always uses the values that were current when the user typed,
+    // even if the component re-renders before the timer fires.
+    const currentProjectId = projectId;
+    const currentWpId = wpId;
+    wpSearchDebounce.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ q: q.trim() });
+        if (currentProjectId) params.set("project", currentProjectId);
+        if (currentWpId) params.set("exclude", String(currentWpId));
+        const res = await fetch(`/api/openproject/tasks/parent-search?${params}`);
+        const data = await res.json();
+        setWpSearchResults(Array.isArray(data) ? data : []);
+      } catch {
+        setWpSearchResults([]);
+      } finally {
+        setWpSearchLoading(false);
+      }
+    }, 300);
+  };
+
+  useEffect(() => () => clearTimeout(wpSearchDebounce.current), []);
+
   const relatedNativeIds = new Set(
     relations.map((r) => String(r.otherId)).filter(Boolean),
   );
-  const targetItems = (allTasks || [])
-    .filter(
-      (t) =>
-        t &&
-        t.id !== selfTaskId &&
-        t.nativeId != null &&
-        !relatedNativeIds.has(String(t.nativeId)),
-    )
+  const targetItems = wpSearchResults
+    .filter((t) => t?.nativeId != null && !relatedNativeIds.has(String(t.nativeId)))
     .map((t) => ({
       label: `${t.key} · ${t.title}`,
       value: String(t.nativeId),
@@ -175,7 +203,19 @@ export function RelationsPanel({
 
       <div className="flex flex-col gap-px">
         {relationsQ.isLoading ? (
-          <LoadingPill label="loading relations" />
+          <div className="flex flex-col gap-1.5 py-1" aria-label="Loading relations" aria-busy="true">
+            <div className="h-0.5 w-full rounded-full bg-surface-muted overflow-hidden">
+              <div className="h-full w-1/3 rounded-full bg-accent/40 animate-[progress_1.4s_ease-in-out_infinite]" />
+            </div>
+            {[72, 88, 60].map((w) => (
+              <div key={w} className="flex items-center gap-2 px-0 py-1">
+                <span className="w-18 sm:w-22 h-4 rounded bg-surface-muted animate-pulse shrink-0" />
+                <span className="w-4 h-4 rounded bg-surface-muted animate-pulse shrink-0" />
+                <span className="w-10 h-3.5 rounded bg-surface-muted animate-pulse shrink-0" />
+                <span className={`h-3.5 rounded bg-surface-muted animate-pulse`} style={{ width: `${w}%` }} />
+              </div>
+            ))}
+          </div>
         ) : sorted.length === 0 && !adding ? (
           <div className="text-[13px] text-fg-subtle py-2">
             No linked work packages.
@@ -298,17 +338,20 @@ export function RelationsPanel({
       {targetMenu && (
         <Menu
           anchorRect={targetMenu}
-          onClose={() => setTargetMenu(null)}
+          onClose={() => { setTargetMenu(null); setWpSearchResults([]); }}
           onSelect={(it) => onPickTarget(it.value)}
-          width={320}
-          maxHeight={300}
+          items={
+            wpSearchLoading
+              ? [{ label: "Searching…", value: null, disabled: true }]
+              : targetItems.length > 0
+              ? targetItems
+              : [{ label: "Type to search work packages…", value: null, disabled: true }]
+          }
           searchable
           searchPlaceholder="Search work packages…"
-          items={
-            targetItems.length > 0
-              ? targetItems
-              : [{ label: "No matching work packages", value: null, disabled: true }]
-          }
+          onSearchChange={(q) => searchWps(q)}
+          width={320}
+          maxHeight={300}
         />
       )}
     </section>

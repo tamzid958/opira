@@ -17,7 +17,6 @@ import { Icon } from "@/components/icons";
 import { TaskTypeIcon } from "@/components/ui/task-meta";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { LoadingPill } from "@/components/ui/loading-pill";
 import { PEOPLE } from "@/lib/data";
 import { findById, safeParseISO as safeISO } from "@/lib/utils";
 import { ratioOf } from "@/lib/openproject/task-state";
@@ -384,7 +383,7 @@ function GroupLeader({ group, mode, open, onToggle }) {
 
 // ─── Public ──────────────────────────────────────────────────────
 
-export function Timeline({ tasks = [], sprints = [], assignees = [], onTaskClick, isLoading }) {
+export function Timeline({ tasks = [], sprints = [], assignees = [], onTaskClick }) {
   const [zoom, setZoom] = useState("month");
   const [groupBy, setGroupBy] = useState("sprint");
   // Per-group open-state overrides. Absent → derived from auto rule (groups
@@ -462,14 +461,6 @@ export function Timeline({ tasks = [], sprints = [], assignees = [], onTaskClick
       else n.add(key);
       return n;
     });
-
-  if (isLoading) {
-    return (
-      <div className="grid place-items-center py-16">
-        <LoadingPill label="loading timeline" />
-      </div>
-    );
-  }
 
   if (tasks.length === 0) {
     return (

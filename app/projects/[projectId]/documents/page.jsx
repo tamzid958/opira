@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import { Documents } from "@/components/documents";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useApiStatus, useProjects } from "@/lib/hooks/use-openproject";
 import { useProjectDocuments } from "@/lib/hooks/use-openproject-detail";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
@@ -20,6 +20,8 @@ export default function DocumentsPage({ params: paramsPromise }) {
     documentsQ,
   );
 
+  if (!pageReady) return <PageSkeleton title="Documents" />;
+
   return (
     <>
       <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 pt-3.5 pb-3 shrink-0">
@@ -28,11 +30,7 @@ export default function DocumentsPage({ params: paramsPromise }) {
         </h1>
       </div>
       <div className="flex-1 px-3 sm:px-6 py-3 sm:py-4 overflow-auto">
-        {!pageReady ? (
-          <div className="grid place-items-center min-h-[40vh]">
-            <LoadingPill label="loading documents" />
-          </div>
-        ) : pageError ? (
+        {pageError ? (
           <div className="p-6 text-pri-highest">{String(pageError.message)}</div>
         ) : (
           <Documents projectId={projectId} projectName={project?.name} />

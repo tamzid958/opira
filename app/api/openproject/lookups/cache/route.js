@@ -3,6 +3,11 @@ import { flushLookupCache, flushSprintCache } from "@/lib/data/redis-lookups-cac
 import { deleteCachedPerms } from "@/lib/openproject/redis-perms-cache";
 import { buildAuthzContext } from "@/lib/data/authz/context";
 import { errorResponse } from "@/lib/openproject/route-utils";
+import { clearLocalCache as clearLookupLocalCache } from "@/lib/data/api/lookup-repository.api.cached";
+import { clearLocalCache as clearLookupsJsCache } from "@/lib/openproject/lookups";
+import { clearLocalCache as clearSprintLocalCache } from "@/lib/data/api/sprint-repository.api";
+import { clearLocalCache as clearStoryPointsCache } from "@/lib/openproject/story-points";
+import { clearEphemeralCaches } from "@/lib/openproject/ephemeral-caches";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +17,11 @@ export const dynamic = "force-dynamic";
 export async function DELETE(_req) {
   try {
     await buildAuthzContext();
+    clearLookupLocalCache();
+    clearLookupsJsCache();
+    clearSprintLocalCache();
+    clearStoryPointsCache();
+    clearEphemeralCaches();
     const [lookups, sprints] = await Promise.all([
       flushLookupCache(),
       flushSprintCache(),

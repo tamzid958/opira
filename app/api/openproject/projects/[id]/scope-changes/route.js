@@ -30,11 +30,8 @@ export async function GET(req, ctx) {
     const filtersJson = buildFilters(filters);
 
     const [now, then, lookups] = await Promise.all([
-      fetchAllPages("/work_packages", { filters: filtersJson }),
-      fetchAllPages("/work_packages", {
-        filters: filtersJson,
-        timestamps: since,
-      }),
+      fetchAllPages("/work_packages", { filters: filtersJson }, { hardCap: Infinity }),
+      fetchAllPages("/work_packages", { filters: filtersJson, timestamps: since }, { hardCap: Infinity }),
       loadLookups(id),
     ]);
     const nowMap = new Map(now.map((wp) => [String(wp.id), wp]));

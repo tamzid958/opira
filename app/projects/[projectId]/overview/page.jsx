@@ -3,7 +3,7 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { Dashboard } from "@/components/dashboard";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import {
   useApiStatus,
   useProjects,
@@ -13,6 +13,7 @@ import {
 import { useMe } from "@/lib/hooks/use-openproject-detail";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 import { pickSprintByDate } from "@/lib/hooks/use-active-sprint";
 
 export default function OverviewPage({ params: paramsPromise }) {
@@ -30,6 +31,8 @@ export default function OverviewPage({ params: paramsPromise }) {
 
   const project = projectsQ.data?.find((p) => p.id === projectId) || null;
   const activeSprint = pickSprintByDate(sprintsQ.data || []);
+  const tasks = tasksQ.data || [];
+  useSetPageTasks(tasks);
 
   // Wait for projects + tasks + sprints + me before rendering: the
   // dashboard hero, active-sprint band, and "your work" rail all read
@@ -42,13 +45,11 @@ export default function OverviewPage({ params: paramsPromise }) {
     me,
   );
 
+  if (!pageReady) return <PageSkeleton />;
+
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-6 pt-0 pb-6">
-      {!pageReady ? (
-        <div className="grid place-items-center min-h-[60vh]">
-          <LoadingPill label="loading overview" />
-        </div>
-      ) : pageError ? (
+      {pageError ? (
         <div className="p-6 text-pri-highest">{String(pageError.message)}</div>
       ) : (
         <Dashboard
@@ -56,7 +57,7 @@ export default function OverviewPage({ params: paramsPromise }) {
           project={project}
           activeSprint={activeSprint}
           sprints={sprintsQ.data || []}
-          tasks={tasksQ.data || []}
+          tasks={tasks}
           activeTab={activeTab}
           onTabChange={(tab) => setParams({ tab })}
           onTaskClick={(id) => setParams({ wp: id })}

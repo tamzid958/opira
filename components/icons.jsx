@@ -62,6 +62,9 @@ import {
   Palette,
   FileText,
   Terminal,
+  Archive,
+  Code,
+  File,
 } from "lucide-react";
 
 const STAR_FILLED = (props) => <Star {...props} fill="currentColor" strokeWidth={0} />;
@@ -129,6 +132,9 @@ const NAME_TO_ICON = {
   download: Download,
   palette: Palette,
   "file-text": FileText,
+  archive: Archive,
+  code: Code,
+  file: File,
   terminal: Terminal,
 };
 

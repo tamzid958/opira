@@ -3,7 +3,7 @@
 import { use } from "react";
 import { Reports } from "@/components/reports";
 import { Icon } from "@/components/icons";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { Menu } from "@/components/ui/menu";
 import { useState } from "react";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/lib/hooks/use-openproject";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
+import { useSetPageTasks } from "@/lib/contexts/tasks-context";
 import { pickSprintByDate } from "@/lib/hooks/use-active-sprint";
 
 export default function ReportsPage({ params: paramsPromise }) {
@@ -35,6 +36,7 @@ export default function ReportsPage({ params: paramsPromise }) {
   })();
 
   const allTasks = tasksQ.data || [];
+  useSetPageTasks(allTasks);
 
   const [sprintMenu, setSprintMenu] = useState(null);
 
@@ -46,20 +48,7 @@ export default function ReportsPage({ params: paramsPromise }) {
     sprintsQ,
   );
 
-  if (!pageReady) {
-    return (
-      <>
-        <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 pt-3.5 pb-3 shrink-0">
-          <h1 className="font-display text-[24px] font-semibold tracking-[-0.022em] text-fg m-0">
-            Reports
-          </h1>
-        </div>
-        <div className="flex-1 grid place-items-center">
-          <LoadingPill label="loading reports" />
-        </div>
-      </>
-    );
-  }
+  if (!pageReady) return <PageSkeleton title="Reports" />;
 
   if (pageError) {
     return (

@@ -137,6 +137,11 @@
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
 }
+@keyframes progress {
+  0%   { transform: translateX(-100%) scaleX(1); }
+  50%  { transform: translateX(100%) scaleX(1.5); }
+  100% { transform: translateX(300%) scaleX(1); }
+}
 
 /*
  * Bridge aliases — legacy variable names used by component CSS classes,
