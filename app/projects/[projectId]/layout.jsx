@@ -133,7 +133,7 @@ export default function ProjectLayout({ children, params: paramsPromise }) {
   // expects a single { id, patch } object — wrap it to bridge the shapes.
   const subtaskUpdateAsync = useCallback(
     (id, patch) => updateTaskMutation.mutateAsync({ id, patch }),
-    [updateTaskMutation.mutateAsync],
+    [updateTaskMutation],
   );
 
   const subtaskBulkMoveSprint = useCallback(async (ids, sprintId) => {
