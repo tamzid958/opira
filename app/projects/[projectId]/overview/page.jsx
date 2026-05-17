@@ -3,7 +3,7 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { Dashboard } from "@/components/dashboard";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import {
   useApiStatus,
   useProjects,
@@ -45,13 +45,11 @@ export default function OverviewPage({ params: paramsPromise }) {
     me,
   );
 
+  if (!pageReady) return <PageSkeleton />;
+
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-6 pt-0 pb-6">
-      {!pageReady ? (
-        <div className="grid place-items-center min-h-[60vh]">
-          <LoadingPill label="loading overview" />
-        </div>
-      ) : pageError ? (
+      {pageError ? (
         <div className="p-6 text-pri-highest">{String(pageError.message)}</div>
       ) : (
         <Dashboard

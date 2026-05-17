@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import { Milestones } from "@/components/milestones";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useApiStatus, useSprints, useTasks } from "@/lib/hooks/use-openproject";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
@@ -22,6 +22,8 @@ export default function MilestonesPage({ params: paramsPromise }) {
 
   const { ready: pageReady, error: pageError } = useQueriesSettled(tasksQ, sprintsQ);
 
+  if (!pageReady) return <PageSkeleton title="Milestones" />;
+
   return (
     <>
       <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 pt-3.5 pb-3 shrink-0">
@@ -30,11 +32,7 @@ export default function MilestonesPage({ params: paramsPromise }) {
         </h1>
       </div>
       <div className="flex-1 px-3 sm:px-6 py-3 sm:py-4 overflow-auto">
-        {!pageReady ? (
-          <div className="grid place-items-center min-h-[40vh]">
-            <LoadingPill label="loading milestones" />
-          </div>
-        ) : pageError ? (
+        {pageError ? (
           <div className="p-6 text-pri-highest">{String(pageError.message)}</div>
         ) : (
           <Milestones

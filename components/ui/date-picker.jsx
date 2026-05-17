@@ -48,13 +48,22 @@ export function DatePicker({
     setOpen(true);
   };
 
+  const POPOVER_HEIGHT = 320;
+  const POPOVER_WIDTH = 320;
+
   const popoverStyle = anchorRect
-    ? {
-        position: "fixed",
-        left: Math.min(anchorRect.left, window.innerWidth - 320),
-        top: anchorRect.bottom + 4,
-        zIndex: 1100,
-      }
+    ? (() => {
+        const spaceBelow = window.innerHeight - anchorRect.bottom - 4;
+        const top =
+          spaceBelow >= POPOVER_HEIGHT
+            ? anchorRect.bottom + 4
+            : Math.max(8, anchorRect.top - POPOVER_HEIGHT - 4);
+        const left = Math.min(
+          Math.max(8, anchorRect.left),
+          window.innerWidth - POPOVER_WIDTH - 8,
+        );
+        return { position: "fixed", left, top, zIndex: 1100 };
+      })()
     : {};
 
   return (

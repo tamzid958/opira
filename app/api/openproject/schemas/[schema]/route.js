@@ -1,11 +1,9 @@
 import { opFetch } from "@/lib/openproject/client";
-import { makeCache } from "@/lib/openproject/route-cache";
 import { errorResponse } from "@/lib/openproject/route-utils";
 import { getCachedSchema, setCachedSchema } from "@/lib/data/redis-lookups-cache";
+import { schemasCache } from "@/lib/openproject/ephemeral-caches";
 
 export const dynamic = "force-dynamic";
-
-const CACHE = makeCache({ ttlMs: 10 * 60 * 1000 });
 
 // Pull a `[{id, value, href}]` list out of one custom-field schema entry.
 // OP's HAL exposes the option set in three different shapes depending on the
@@ -53,11 +51,11 @@ export async function GET(_req, ctx) {
 
     const redisCached = await getCachedSchema(schema);
     if (redisCached) {
-      CACHE.set(schema, redisCached);
+      schemasCache.set(schema, redisCached);
       return Response.json(redisCached);
     }
 
-    const cached = CACHE.get(schema);
+    const cached = schemasCache.get(schema);
     if (cached) return Response.json(cached);
 
     const [projectId, typeId] = String(schema).split("-");
@@ -113,7 +111,7 @@ export async function GET(_req, ctx) {
       (f) => f.type !== "CustomOption" || f.allowedValues || f.allowedValuesHref,
     );
     if (isComplete) {
-      CACHE.set(schema, value);
+      schemasCache.set(schema, value);
       await setCachedSchema(schema, value);
     }
     return Response.json(value);

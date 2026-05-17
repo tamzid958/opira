@@ -2,6 +2,8 @@ import { errorResponse } from "@/lib/openproject/route-utils";
 import { getRepositories } from "@/lib/data/factory";
 import { buildAuthzContext } from "@/lib/data/authz/context";
 import { flushAssigneesCache } from "@/lib/data/redis-lookups-cache";
+import { invalidateViewerPermissions } from "@/lib/openproject/permissions";
+import { clearAssigneesLocalCache } from "@/lib/openproject/ephemeral-caches";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +33,9 @@ export async function POST(req) {
     const ctx = await buildAuthzContext();
     const { memberships: repo } = getRepositories();
     const created = await repo.create(ctx, data);
+    clearAssigneesLocalCache();
     void flushAssigneesCache();
+    void invalidateViewerPermissions(data.principalId ? String(data.principalId) : null);
     return Response.json(created);
   } catch (e) {
     return errorResponse(e);

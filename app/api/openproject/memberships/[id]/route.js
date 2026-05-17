@@ -5,6 +5,8 @@ import {
   mapMembership,
 } from "@/lib/openproject/mappers";
 import { flushAssigneesCache } from "@/lib/data/redis-lookups-cache";
+import { invalidateViewerPermissions } from "@/lib/openproject/permissions";
+import { clearAssigneesLocalCache } from "@/lib/openproject/ephemeral-caches";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +28,9 @@ export async function PATCH(req, ctx) {
       method: "PATCH",
       body: JSON.stringify(body),
     });
+    clearAssigneesLocalCache();
     void flushAssigneesCache();
+    void invalidateViewerPermissions(null);
     return Response.json(mapMembership(updated));
   } catch (e) {
     return errorResponse(e);
@@ -39,7 +43,9 @@ export async function DELETE(_req, ctx) {
     await opFetch(`/memberships/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    clearAssigneesLocalCache();
     void flushAssigneesCache();
+    void invalidateViewerPermissions(null);
     return new Response(null, { status: 204 });
   } catch (e) {
     return errorResponse(e);

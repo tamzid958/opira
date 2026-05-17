@@ -9,7 +9,7 @@ import { BoardTriageLane } from "@/components/board-triage-lane";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Icon } from "@/components/icons";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { Menu } from "@/components/ui/menu";
 import {
   useAvailableAssignees,
@@ -475,20 +475,7 @@ export default function BoardPage({ params: paramsPromise }) {
   // While loading, render a stable shell — generic title, no chips, no
   // sprint selector — so nothing in the chrome morphs from placeholder to
   // real value as queries land.
-  if (!pageReady) {
-    return (
-      <>
-        <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 pt-3.5 pb-3 shrink-0">
-          <h1 className="font-display text-[24px] font-semibold tracking-[-0.022em] text-fg m-0">
-            Board
-          </h1>
-        </div>
-        <div className="flex-1 grid place-items-center">
-          <LoadingPill label="loading board" />
-        </div>
-      </>
-    );
-  }
+  if (!pageReady) return <PageSkeleton title="Board" />;
 
   if (pageError) {
     return (

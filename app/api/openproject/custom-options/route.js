@@ -1,11 +1,9 @@
 import { fetchAllPages } from "@/lib/openproject/client";
 import { errorResponse } from "@/lib/openproject/route-utils";
-import { makeCache } from "@/lib/openproject/route-cache";
 import { getCachedCustomOptions, setCachedCustomOptions } from "@/lib/data/redis-lookups-cache";
+import { customOptionsCache } from "@/lib/openproject/ephemeral-caches";
 
 export const dynamic = "force-dynamic";
-
-const LOCAL_OPTIONS = makeCache({ ttlMs: 5 * 60_000 });
 
 // Resolves an allowedValues collection from a schema field. Caller passes the
 // HAL href via ?href=/api/v3/...
@@ -20,12 +18,12 @@ export async function GET(req) {
       return Response.json({ error: "href is required" }, { status: 400 });
     }
 
-    const local = LOCAL_OPTIONS.get(href);
+    const local = customOptionsCache.get(href);
     if (local) return Response.json(local);
 
     const redis = await getCachedCustomOptions(href);
     if (redis) {
-      LOCAL_OPTIONS.set(href, redis);
+      customOptionsCache.set(href, redis);
       return Response.json(redis);
     }
 
@@ -33,7 +31,7 @@ export async function GET(req) {
     const els = await fetchAllPages(path);
     const result = els.map((o) => ({ id: String(o.id), value: o.value, href: o._links?.self?.href }));
 
-    LOCAL_OPTIONS.set(href, result);
+    customOptionsCache.set(href, result);
     await setCachedCustomOptions(href, result);
     return Response.json(result);
   } catch (e) {

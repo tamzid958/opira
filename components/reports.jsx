@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { Avatar } from "@/components/ui/avatar";
-import { LoadingPill } from "@/components/ui/loading-pill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/icons";
 import { TaskTypeIcon } from "@/components/ui/task-meta";
@@ -81,6 +80,17 @@ const PANEL_TITLE =
 const PANEL_SUB = "text-xs text-fg-subtle";
 const PANEL_LEGEND = "ml-auto flex items-center gap-3 text-xs text-fg-subtle";
 const SWATCH = "inline-block w-2.5 h-2.5 rounded-sm align-middle mr-1.5";
+
+function PanelLoadingShimmer() {
+  return (
+    <div className="px-5 py-4 flex flex-col gap-2.5" aria-hidden="true">
+      <div className="h-0.5 w-full bg-surface-muted overflow-hidden rounded-full">
+        <div className="h-full w-1/3 bg-accent/40 animate-[progress_1.4s_ease-in-out_infinite]" />
+      </div>
+      <div className="h-32 w-full rounded-md bg-surface-muted animate-pulse" />
+    </div>
+  );
+}
 const KPI_VALUE =
   "font-display text-[28px] sm:text-[32px] font-semibold tracking-[-0.024em] text-fg leading-none mt-2 tabular-nums";
 const KPI_SUB = "text-[11px] text-fg-subtle mt-1.5 leading-snug";
@@ -226,12 +236,9 @@ function Burndown({ projectId, sprint }) {
     return (
       <div className={PANEL}>
         <div className={PANEL_HEADER}>
-          <h3 className={PANEL_TITLE}>
-            Sprint burndown
-            <BestEffort />
-          </h3>
-          <LoadingPill label="reconstructing from activities" />
+          <h3 className={PANEL_TITLE}>Sprint burndown<BestEffort /></h3>
         </div>
+        <PanelLoadingShimmer />
       </div>
     );
   }
@@ -560,12 +567,9 @@ function SprintReport({ projectId, sprint, sprintTasks, mode = "numeric" }) {
     return (
       <div className={PANEL}>
         <div className={PANEL_HEADER}>
-          <h3 className={PANEL_TITLE}>
-            Sprint report
-            <BestEffort />
-          </h3>
-          <LoadingPill label="loading scope" />
+          <h3 className={PANEL_TITLE}>Sprint report<BestEffort /></h3>
         </div>
+        <PanelLoadingShimmer />
       </div>
     );
   }
@@ -871,8 +875,8 @@ function VelocityChart({ projectId }) {
       <div className={`${PANEL} w-full flex flex-col`}>
         <div className={PANEL_HEADER}>
           <h3 className={PANEL_TITLE}>Velocity</h3>
-          <LoadingPill label="loading velocity" />
         </div>
+        <PanelLoadingShimmer />
       </div>
     );
   }

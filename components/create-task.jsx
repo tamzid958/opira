@@ -132,6 +132,7 @@ export function CreateTask({
   defaultParentName = null,
   projectName = "Project",
   projectId = null,
+  numericProjectId = null,
   categories = [],
   types = [],
   priorities = [],
@@ -205,14 +206,22 @@ export function CreateTask({
   // schemaHref tells us whether SP is a CustomOption (t-shirt sizes) or
   // numeric, and exposes the option list either via allowedValues or via
   // sample-WP discovery on the schema route. Falls back to any task, then
-  // null (renders the legacy numeric picker).
+  // constructs the schema key from numericProjectId + current type (so the
+  // schema fetch can start before the tasks list arrives on hard refresh),
+  // then null (renders the legacy numeric picker).
   const schemaHref = (() => {
     const list = Array.isArray(tasks) ? tasks : [];
-    return (
+    const fromTask =
       list.find((t) => String(t.typeId) === String(type))?.schemaHref ||
       list[0]?.schemaHref ||
-      null
-    );
+      null;
+    if (fromTask) return fromTask;
+    // Construct key from known projectId + selected type — allows the schema
+    // fetch to begin in parallel with (or before) the tasks list resolves.
+    if (numericProjectId && type) {
+      return `/api/v3/work_packages/schemas/${numericProjectId}-${type}`;
+    }
+    return null;
   })();
   const schemaQ = useWpSchema(schemaHref);
   const { storyPointsField, aiEnabled } = usePublicConfig();
@@ -561,6 +570,7 @@ export function CreateTask({
                     <TShirtPicker
                       value={pointsLabel}
                       allowed={spOptions || []}
+                      isLoading={!spOptions && (schemaQ.isLoading || spOptionsQ.isLoading)}
                       onChange={(label, href) => {
                         setValue("pointsHref", href);
                         setValue("points", label);

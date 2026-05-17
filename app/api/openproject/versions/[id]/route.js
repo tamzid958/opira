@@ -2,6 +2,7 @@ import { opFetch } from "@/lib/openproject/client";
 import { buildVersionPatchBody, mapVersionFull } from "@/lib/openproject/mappers";
 import { errorResponse } from "@/lib/openproject/route-utils";
 import { flushSprintCache } from "@/lib/data/redis-lookups-cache";
+import { clearLocalCache as clearSprintLocalCache } from "@/lib/data/api/sprint-repository.api";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export async function PATCH(req, ctx) {
       method: "PATCH",
       body: JSON.stringify(buildVersionPatchBody(data)),
     });
+    clearSprintLocalCache();
     void flushSprintCache();
     return Response.json(mapVersionFull(v));
   } catch (e) {
@@ -38,6 +40,7 @@ export async function DELETE(_req, ctx) {
   try {
     const { id } = await ctx.params;
     await opFetch(`/versions/${id}`, { method: "DELETE" });
+    clearSprintLocalCache();
     void flushSprintCache();
     return new Response(null, { status: 204 });
   } catch (e) {

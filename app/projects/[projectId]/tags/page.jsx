@@ -3,7 +3,7 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { Tags } from "@/components/tags";
-import { LoadingPill } from "@/components/ui/loading-pill";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useApiStatus, useProjects, useTasks } from "@/lib/hooks/use-openproject";
 import { useQueriesSettled } from "@/lib/hooks/use-queries-settled";
 import { useSetPageTasks } from "@/lib/contexts/tasks-context";
@@ -25,6 +25,8 @@ export default function TagsPage({ params: paramsPromise }) {
     projectsQ,
   );
 
+  if (!pageReady) return <PageSkeleton title="Tags" />;
+
   return (
     <>
       <div className="bg-surface-elevated border-b border-border px-3 sm:px-6 pt-3.5 pb-3 shrink-0">
@@ -33,11 +35,7 @@ export default function TagsPage({ params: paramsPromise }) {
         </h1>
       </div>
       <div className="flex-1 px-3 sm:px-6 py-3 sm:py-4 overflow-auto">
-        {!pageReady ? (
-          <div className="grid place-items-center min-h-[40vh]">
-            <LoadingPill label="loading tags" />
-          </div>
-        ) : pageError ? (
+        {pageError ? (
           <div className="p-6 text-pri-highest">{String(pageError.message)}</div>
         ) : (
           <Tags

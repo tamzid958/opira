@@ -32,6 +32,7 @@ const NUMERIC_OPTIONS = [
 
 export function EstimatePicker({
   mode,
+  isLoadingOptions = false,
   task,
   allowed,
   disabled = false,
@@ -43,6 +44,7 @@ export function EstimatePicker({
       <TShirtPicker
         value={task?.pointsRaw}
         allowed={allowed}
+        isLoading={isLoadingOptions}
         onChange={onChange}
       />
     );

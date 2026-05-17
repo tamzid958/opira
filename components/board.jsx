@@ -176,92 +176,6 @@ function DraggableCard({
   );
 }
 
-// In-column inline create. Click "+ Create issue" → expands an input;
-// type a title + Enter to fire `onSubmit(title)`; Esc / blur with empty
-// closes. Holds focus so consecutive creates are a single keystroke loop.
-function InlineCreate({ statusId, statusName, onSubmit }) {
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (open && inputRef.current) inputRef.current.focus();
-  }, [open]);
-
-  const reset = () => {
-    setValue("");
-    setOpen(false);
-  };
-
-  const submit = async () => {
-    const title = value.trim();
-    if (!title || busy) return;
-    setBusy(true);
-    try {
-      await onSubmit?.(title);
-      // Stay open — most create flows are bursty (two or three rows in a
-      // row). Just clear the input and re-focus.
-      setValue("");
-      requestAnimationFrame(() => inputRef.current?.focus());
-    } catch {
-      // Toast already raised by the calling hook; keep the input filled.
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label={`Create issue in ${statusName}`}
-        className="w-full flex items-center gap-1 px-2 h-7 rounded text-fg-subtle text-xs font-medium hover:bg-surface-subtle hover:text-fg cursor-pointer text-left"
-      >
-        <Icon name="plus" size={14} aria-hidden="true" /> Create issue
-      </button>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-1 px-1.5 py-1 rounded border border-accent/60 bg-surface-elevated shadow-sm">
-      <Icon name="plus" size={13} className="text-fg-subtle ml-1" aria-hidden="true" />
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            submit();
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            reset();
-          }
-        }}
-        onBlur={() => {
-          if (!value.trim() && !busy) reset();
-        }}
-        disabled={busy}
-        placeholder="What needs doing?"
-        className="flex-1 bg-transparent border-0 outline-none text-[12px] text-fg placeholder:text-fg-faint min-w-0 disabled:opacity-50"
-        aria-label={`New issue title for ${statusName}`}
-      />
-      {busy ? (
-        <Icon name="loader" size={12} className="text-fg-subtle animate-spin mr-1.5" aria-hidden="true" />
-      ) : (
-        <span
-          className="text-[10px] text-fg-faint mr-1.5"
-          title="Press Enter to create, Esc to cancel"
-        >
-          ↵
-        </span>
-      )}
-    </div>
-  );
-}
-
 // Floating "Send to backlog" rail that only appears while a card is being
 // dragged. Drop target uses a sentinel id so the parent's onDragEnd can
 // route a sprint-clear PATCH instead of a status PATCH.
@@ -291,7 +205,6 @@ function DroppableColumn({
   isOver,
   onCreate,
   canCreate,
-  onInlineCreate,
   dropDiscouraged,
 }) {
   const { setNodeRef } = useDroppable({ id: `status:${status.id}` });
@@ -346,11 +259,14 @@ function DroppableColumn({
       </div>
       {canCreate ? (
         <div className="px-2 py-1.5 pb-2 border-t border-border-soft bg-transparent">
-          <InlineCreate
-            statusId={status.id}
-            statusName={status.name}
-            onSubmit={(title) => onInlineCreate?.(status.id, title)}
-          />
+          <button
+            type="button"
+            onClick={onCreate}
+            aria-label={`Create issue in ${status.name}`}
+            className="w-full flex items-center gap-1 px-2 h-7 rounded text-fg-subtle text-xs font-medium hover:bg-surface-subtle hover:text-fg cursor-pointer text-left"
+          >
+            <Icon name="plus" size={14} aria-hidden="true" /> Create issue
+          </button>
         </div>
       ) : null}
     </div>
@@ -387,7 +303,6 @@ export function Board({
   onTaskClick,
   onMoveTask,
   onCreateInColumn,
-  onInlineCreate,
   onBulkUpdate,
   onBulkDelete,
   carryover,
@@ -939,7 +854,6 @@ export function Board({
             isOver={overStatusId === String(status.id)}
             canCreate={canCreate}
             onCreate={() => onCreateInColumn?.(status.id, status.name)}
-            onInlineCreate={onInlineCreate}
             dropDiscouraged={
               !!activeId &&
               allowedStatusIds != null &&

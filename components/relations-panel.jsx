@@ -6,7 +6,6 @@ import { friendlyError } from "@/lib/api-client";
 import { Icon } from "@/components/icons";
 import { TaskStatusPill, TaskTypeIcon } from "@/components/ui/task-meta";
 import { Menu } from "@/components/ui/menu";
-import { LoadingPill } from "@/components/ui/loading-pill";
 import { OUTGOING_RELATION_TYPES, RELATION_LABELS } from "@/lib/openproject/mappers";
 import {
   useCreateRelation,
@@ -204,7 +203,19 @@ export function RelationsPanel({
 
       <div className="flex flex-col gap-px">
         {relationsQ.isLoading ? (
-          <LoadingPill label="loading relations" />
+          <div className="flex flex-col gap-1.5 py-1" aria-label="Loading relations" aria-busy="true">
+            <div className="h-0.5 w-full rounded-full bg-surface-muted overflow-hidden">
+              <div className="h-full w-1/3 rounded-full bg-accent/40 animate-[progress_1.4s_ease-in-out_infinite]" />
+            </div>
+            {[72, 88, 60].map((w) => (
+              <div key={w} className="flex items-center gap-2 px-0 py-1">
+                <span className="w-18 sm:w-22 h-4 rounded bg-surface-muted animate-pulse shrink-0" />
+                <span className="w-4 h-4 rounded bg-surface-muted animate-pulse shrink-0" />
+                <span className="w-10 h-3.5 rounded bg-surface-muted animate-pulse shrink-0" />
+                <span className={`h-3.5 rounded bg-surface-muted animate-pulse`} style={{ width: `${w}%` }} />
+              </div>
+            ))}
+          </div>
         ) : sorted.length === 0 && !adding ? (
           <div className="text-[13px] text-fg-subtle py-2">
             No linked work packages.
