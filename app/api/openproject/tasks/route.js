@@ -4,13 +4,7 @@ import { buildAuthzContext } from "@/lib/data/authz/context";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_HARD_CAP = 1000;
-const MAX_HARD_CAP = 2000;
-
 function clampInt(raw, { min, max, fallback }) {
-  // `Number(null)` is 0 (not NaN), so a missing query param would slip
-  // through `isFinite` and return `min` from the clamp — making `?limit=`
-  // omitted behave the same as `?limit=1`. Reject empty values up front.
   if (raw == null || raw === "") return fallback;
   const n = Number(raw);
   if (!Number.isFinite(n)) return fallback;
@@ -24,7 +18,6 @@ export async function GET(req) {
     const sprintId = url.searchParams.get("sprint");
     const pageSizeRaw = url.searchParams.get("pageSize");
     const offsetRaw = url.searchParams.get("offset");
-    const limitRaw = url.searchParams.get("limit");
 
     const ctx = await buildAuthzContext();
     const { tasks: repo } = getRepositories();
@@ -42,12 +35,7 @@ export async function GET(req) {
       });
     }
 
-    const limit = clampInt(limitRaw, {
-      min: 1,
-      max: MAX_HARD_CAP,
-      fallback: DEFAULT_HARD_CAP,
-    });
-    const result = await repo.list(ctx, { projectId, sprintId, limit });
+    const result = await repo.list(ctx, { projectId, sprintId });
     return Response.json(result.tasks);
   } catch (e) {
     return errorResponse(e);
