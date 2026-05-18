@@ -14,7 +14,8 @@ import {
 import { useApiStatus } from "@/lib/hooks/use-openproject";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { friendlyError } from "@/lib/api-client";
-import { AttachmentsGrid } from "@/components/attachments-grid";
+import { getTileStyle } from "@/components/attachments-grid";
+import { AttachmentLightbox } from "@/components/ui/attachment-lightbox";
 
 // Confluence-style reading surface for OpenProject "documents". The OP
 // v3 API only supports GET on documents (PATCH is technically allowed
@@ -32,6 +33,7 @@ export function Documents({ projectId, projectName }) {
   const listQ = useProjectDocuments(projectId);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("recent");
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   const status = useApiStatus();
   const { params, setParams } = useUrlParams();
   const selectedId = params.get("doc") || null;
@@ -238,12 +240,73 @@ export function Documents({ projectId, projectName }) {
                 This document has no body yet.
               </p>
             )}
-            <div className="mt-8 pt-6 border-t border-border-soft">
-              <AttachmentsGrid
-                docId={selected.id}
-                canAdd={selected.permissions?.addAttachment ?? false}
-              />
-            </div>
+            {(() => {
+              const attachments = docQ.data?.attachments || [];
+              if (!attachments.length) return null;
+              return (
+                <div className="mt-8 pt-6 border-t border-border-soft">
+                  <div className="text-[13px] font-semibold text-fg mb-2">
+                    Attachments{" "}
+                    <span className="text-fg-subtle font-medium text-xs ml-0.5">
+                      {attachments.length}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
+                    {attachments.map((a, idx) => {
+                      const { icon, bg } = getTileStyle(a.contentType);
+                      return (
+                        <div
+                          key={a.id}
+                          className="border border-border rounded-md p-2 bg-surface-elevated text-xs flex flex-col gap-1"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setLightboxIndex(idx)}
+                            aria-label={`Preview ${a.fileName}`}
+                            className={[
+                              "grid place-items-center h-17 rounded w-full overflow-hidden cursor-pointer border-0 p-0",
+                              bg ?? "bg-linear-to-br from-[#fbbf24] to-[#f59e0b]",
+                            ].join(" ")}
+                          >
+                            {icon === "image" ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={a.downloadUrl}
+                                alt={a.fileName}
+                                loading="lazy"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="grid place-items-center w-full h-full text-current" aria-hidden="true">
+                                <Icon name={icon} size={20} />
+                              </span>
+                            )}
+                          </button>
+                          <div className="font-medium text-fg truncate" title={a.fileName}>
+                            {a.fileName}
+                          </div>
+                          <div className="text-fg-subtle text-[11px]">
+                            {a.fileSize != null
+                              ? a.fileSize < 1024 * 1024
+                                ? `${Math.round(a.fileSize / 1024)} KB`
+                                : `${(a.fileSize / (1024 * 1024)).toFixed(1)} MB`
+                              : "—"}
+                            {a.createdAt ? ` · ${formatRelDate(a.createdAt)}` : ""}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {lightboxIndex !== null && (
+                    <AttachmentLightbox
+                      items={attachments}
+                      initialIndex={lightboxIndex}
+                      onClose={() => setLightboxIndex(null)}
+                    />
+                  )}
+                </div>
+              );
+            })()}
           </article>
         )}
       </main>
