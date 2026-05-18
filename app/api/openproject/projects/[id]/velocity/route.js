@@ -64,7 +64,6 @@ async function computeVelocity(projectId) {
       const liveEls = await fetchAllPages(
         `/projects/${encodeURIComponent(projectId)}/work_packages`,
         { filters: versionFilters },
-        { hardCap: Infinity },
       );
       // Snapshot at sprint-end determines BOTH who was in the sprint and
       // the historical weights — so a post-close points resize doesn't
@@ -77,7 +76,6 @@ async function computeVelocity(projectId) {
         snapshotEls = await fetchAllPages(
           `/projects/${encodeURIComponent(projectId)}/work_packages`,
           { filters: versionFilters, timestamps: ts },
-          { hardCap: Infinity },
         );
         timeTraveled = true;
       } catch {

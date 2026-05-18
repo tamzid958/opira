@@ -287,8 +287,7 @@ export function TaskDetail({
 
   const childrenQ = useChildren(wpId, !!wpId);
   // Merge API-fetched children into allTasks so SubtaskBreakdown's child
-  // index is accurate even when the project-wide task list is truncated
-  // by the hard cap (e.g. projects with >1000 work packages).
+  // index is accurate even when the parent isn't in the current sprint pool.
   const allTasksWithChildren = (() => {
     const fetched = childrenQ.data;
     if (!fetched?.length) return tasks;

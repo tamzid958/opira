@@ -12,7 +12,6 @@ export async function GET(_req, ctx) {
     const els = await fetchAllPages(
       "/work_packages",
       { filters, sortBy: JSON.stringify([["createdAt", "asc"]]) },
-      { hardCap: Infinity },
     );
     const tasks = els.map((wp) => mapWorkPackage(wp));
     return Response.json(tasks);

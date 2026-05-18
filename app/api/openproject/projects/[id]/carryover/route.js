@@ -49,7 +49,6 @@ async function computeCarryover(projectId) {
         { version: { operator: "=", values: openLockedIds } },
       ]),
     },
-    { hardCap: Infinity },
   );
   const wps = wpEls.map((wp) => mapWorkPackage(wp));
   const truncated = wps.length > WP_FETCH_CAP;
