@@ -14,6 +14,7 @@ import {
 import { useApiStatus } from "@/lib/hooks/use-openproject";
 import { useUrlParams } from "@/lib/hooks/use-modal-url";
 import { friendlyError } from "@/lib/api-client";
+import { AttachmentsGrid } from "@/components/attachments-grid";
 
 // Confluence-style reading surface for OpenProject "documents". The OP
 // v3 API only supports GET on documents (PATCH is technically allowed
@@ -237,6 +238,12 @@ export function Documents({ projectId, projectName }) {
                 This document has no body yet.
               </p>
             )}
+            <div className="mt-8 pt-6 border-t border-border-soft">
+              <AttachmentsGrid
+                docId={selected.id}
+                canAdd={selected.permissions?.addAttachment ?? false}
+              />
+            </div>
           </article>
         )}
       </main>

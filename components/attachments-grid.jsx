@@ -13,6 +13,9 @@ import {
   useAttachments,
   useDeleteAttachment,
   useUploadAttachment,
+  useDocumentAttachments,
+  useDeleteDocumentAttachment,
+  useUploadDocumentAttachment,
 } from "@/lib/hooks/use-openproject-detail";
 
 const ARCHIVE_TYPES = new Set([
@@ -50,10 +53,17 @@ function formatBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function AttachmentsGrid({ wpId, canAdd = true }) {
-  const att = useAttachments(wpId);
-  const upload = useUploadAttachment(wpId);
-  const del = useDeleteAttachment(wpId);
+export function AttachmentsGrid({ wpId, docId, canAdd = true }) {
+  const attWp = useAttachments(wpId, !!wpId);
+  const uploadWp = useUploadAttachment(wpId);
+  const delWp = useDeleteAttachment(wpId);
+  const attDoc = useDocumentAttachments(docId, !!docId);
+  const uploadDoc = useUploadDocumentAttachment(docId);
+  const delDoc = useDeleteDocumentAttachment(docId);
+
+  const att = docId ? attDoc : attWp;
+  const upload = docId ? uploadDoc : uploadWp;
+  const del = docId ? delDoc : delWp;
   const [confirmId, setConfirmId] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
