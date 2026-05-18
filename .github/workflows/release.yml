@@ -59,7 +59,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/opira
           flavor: |
-            latest=false
+            latest=auto
           tags: |
             type=semver,pattern={{version}},value=${{ github.event.inputs.tag || github.ref_name }}
           labels: |
